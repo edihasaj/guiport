@@ -21,6 +21,12 @@ public protocol DesktopAdapter: Sendable {
     func requestScreenRecordingPermission() -> Bool
     func openSystemSettings(for permission: PermissionKind)
 
+    /// Force a screen-capture API call so macOS reliably enrols the binary into TCC.
+    /// Some macOS versions only add an entry to System Settings → Screen Recording after
+    /// an actual capture attempt; `CGRequestScreenCaptureAccess()` alone is not always
+    /// enough. Implementations should swallow any result.
+    func enrolScreenRecording()
+
     // MARK: - Apps
 
     func listApps(onlyWithWindows: Bool) throws -> [AppInfo]
@@ -93,6 +99,7 @@ public struct UnconfiguredAdapter: DesktopAdapter {
     public func hasScreenRecordingPermission() -> Bool { false }
     public func requestScreenRecordingPermission() -> Bool { false }
     public func openSystemSettings(for permission: PermissionKind) {}
+    public func enrolScreenRecording() {}
 
     public func listApps(onlyWithWindows: Bool) throws -> [AppInfo] { throw unsupported("listing apps") }
     public func resolveApp(name: String?, windowTitle: String?) throws -> AppTarget { throw unsupported("resolving an app") }

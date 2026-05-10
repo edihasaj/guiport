@@ -1,4 +1,5 @@
 import AppKit
+import CoreGraphics
 import Foundation
 import GuiportCore
 
@@ -15,6 +16,14 @@ public struct MacAdapter: DesktopAdapter {
     public func promptAccessibility() -> Bool { AXBridge.promptAccessibilityIfNeeded() }
     public func hasScreenRecordingPermission() -> Bool { Screenshot.hasScreenRecordingPermission() }
     public func requestScreenRecordingPermission() -> Bool { Screenshot.requestScreenRecordingPermission() }
+
+    public func enrolScreenRecording() {
+        // Side-effecting: actually attempt a tiny capture so macOS adds guiport
+        // (CFBundleIdentifier dev.guiport.cli) to System Settings → Screen Recording.
+        // Result is intentionally discarded.
+        _ = CGDisplayCreateImage(CGMainDisplayID())
+    }
+
     public func openSystemSettings(for permission: PermissionKind) {
         let url: String?
         switch permission {

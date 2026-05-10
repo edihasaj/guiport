@@ -12,6 +12,7 @@ struct Guiport: AsyncParsableCommand {
         abstract: "Fast CLI/MCP control layer for desktop apps. Built for coding agents.",
         version: GuiportCore.Guiport.version,
         subcommands: [
+            InitCommand.self,
             DoctorCommand.self,
             AppsCommand.self,
             ObserveCommand.self,

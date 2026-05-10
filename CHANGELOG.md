@@ -4,6 +4,14 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+## [0.1.3] — 2026-05-10
+
+### Added
+- `guiport init` — friendly first-run command. Fires Accessibility + Screen Recording prompts, opens the right Settings panes, and prints clear "look for guiport in the list, toggle it on" guidance.
+
+### Fixed
+- `guiport doctor --fix` now forces an actual screen-capture attempt (`CGDisplayCreateImage`) when Screen Recording isn't granted, so macOS reliably adds `guiport` to System Settings → Privacy & Security → Screen Recording. Calling `CGRequestScreenCaptureAccess()` alone wasn't always enough on recent macOS; only a real capture attempt enrols the binary into TCC's UI list.
+
 ## [0.1.2] — 2026-05-10
 
 ### Fixed

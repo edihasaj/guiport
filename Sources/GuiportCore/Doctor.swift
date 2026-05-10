@@ -43,6 +43,10 @@ public enum Doctor {
     }
 
     /// Trigger any missing prompts and (best-effort) open System Settings panes.
+    /// For Screen Recording, also force an actual capture attempt so macOS reliably
+    /// enrols the binary into TCC. After this runs, an entry named `guiport` will
+    /// appear under System Settings → Privacy & Security → Screen Recording (if it
+    /// wasn't already there).
     public static func fix() -> DoctorReport {
         let a = Adapter.current
         if !a.isAccessibilityTrusted() {
@@ -51,6 +55,7 @@ public enum Doctor {
         }
         if !a.hasScreenRecordingPermission() {
             _ = a.requestScreenRecordingPermission()
+            a.enrolScreenRecording()       // forces TCC enrolment
             a.openSystemSettings(for: .screenRecording)
         }
         return checkAll()
