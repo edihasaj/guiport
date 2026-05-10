@@ -77,18 +77,18 @@ guiport serve   --mcp   <span class="comment"># expose to Claude / Codex / openc
   <div class="grid-3">
     <div class="card">
       <div class="card-num">a.</div>
-      <h3>AX-first.</h3>
-      <p>Stable selectors against the macOS Accessibility tree. <code>~80ms</code> full window walk, <code>~60µs</code> cached find.</p>
+      <h3>Stable selectors.</h3>
+      <p>Click and inspect by name, role, or identifier — never coordinates. Sub-second to read any window.</p>
     </div>
     <div class="card">
       <div class="card-num">b.</div>
-      <h3>Vision fallback.</h3>
-      <p>When AX is sparse (Electron, canvas), Apple Vision OCR finds text and clicks its center. On-device, free, no extra deps.</p>
+      <h3>Visual fallback.</h3>
+      <p>When an app doesn't expose its structure, guiport falls back to reading what's on screen. Works on canvas and Electron apps too.</p>
     </div>
     <div class="card">
       <div class="card-num">c.</div>
-      <h3>Replay-first.</h3>
-      <p>Record once, replay 10× without an LLM. Failures save tree JSON + screenshot + action log to <code>artifacts/</code>.</p>
+      <h3>Record once, replay forever.</h3>
+      <p>Capture a flow, save it as YAML, replay deterministically without an LLM. Failures auto-save artifacts so you know exactly what broke.</p>
     </div>
   </div>
 </section>
@@ -157,7 +157,7 @@ Code            com.microsoft.VSCode   pid=48047  windows=1</pre>
   <pre>$ guiport click --app Calculator <span class="str">'AXButton[identifier="Five"]'</span>
 {"path":"ax","selector":"AXButton[identifier=\"Five\"]","detail":"5"}</pre>
 
-  <h3>Sparse AX? Fall back to OCR.</h3>
+  <h3>App doesn't expose structure? Fall back to what's on screen.</h3>
   <pre>$ guiport click --app Figma <span class="str">'AXButton[name="Save"]'</span> --fallback ocr
 {"path":"ocr","detail":"Save @ 980,124"}</pre>
 
@@ -278,10 +278,10 @@ steps:
       <div class="plat-body">
         <div class="plat-meta">macOS 13+ · arm64 + x86_64</div>
         <ul>
-          <li>Apple Accessibility (AX) tree</li>
-          <li>CGEvent input synthesis</li>
-          <li>Apple Vision OCR fallback</li>
-          <li>CGEventTap live recorder</li>
+          <li>Inspect any app's UI as structured data</li>
+          <li>Click, type, hotkey by selector</li>
+          <li>Record once, replay deterministically</li>
+          <li>Visual fallback for canvas / Electron apps</li>
         </ul>
         <a class="btn primary small" href="#install">[ install ]</a>
       </div>
@@ -293,12 +293,12 @@ steps:
         <span class="pill soon">coming soon</span>
       </div>
       <div class="plat-body">
-        <div class="plat-meta">X11 first · Wayland after core stabilizes</div>
+        <div class="plat-meta">Same selectors, same YAML, same MCP.</div>
         <ul>
-          <li>AT-SPI2 over D-Bus</li>
-          <li>XTest / libei input</li>
-          <li>Tesseract OCR fallback</li>
-          <li>Same YAML + MCP surface</li>
+          <li>Inspect any app's UI as structured data</li>
+          <li>Click, type, hotkey by selector</li>
+          <li>Record once, replay deterministically</li>
+          <li>Visual fallback for sparse-UI apps</li>
         </ul>
         <a class="btn ghost small" href="https://github.com/edihasaj/guiport/issues?q=label%3Alinux" target="_blank" rel="noreferrer">[ track ↗ ]</a>
       </div>
@@ -310,12 +310,12 @@ steps:
         <span class="pill soon">coming soon</span>
       </div>
       <div class="plat-body">
-        <div class="plat-meta">Windows 10+ · interactive session</div>
+        <div class="plat-meta">Same selectors, same YAML, same MCP.</div>
         <ul>
-          <li>UI Automation (UIA)</li>
-          <li>SendInput / Win32 input</li>
-          <li>Tesseract OCR fallback</li>
-          <li>Same YAML + MCP surface</li>
+          <li>Inspect any app's UI as structured data</li>
+          <li>Click, type, hotkey by selector</li>
+          <li>Record once, replay deterministically</li>
+          <li>Visual fallback for sparse-UI apps</li>
         </ul>
         <a class="btn ghost small" href="https://github.com/edihasaj/guiport/issues?q=label%3Awindows" target="_blank" rel="noreferrer">[ track ↗ ]</a>
       </div>

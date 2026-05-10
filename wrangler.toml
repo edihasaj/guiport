@@ -1,0 +1,21 @@
+# Cloudflare Pages config for the guiport landing.
+#
+# Today the docs/ directory is served via GitHub Pages with a custom domain
+# (guiport.dev) pointed at GitHub's anycast IPs through Cloudflare DNS.
+#
+# To migrate to Cloudflare Pages later:
+#   1. Add `Cloudflare Pages: Edit` (and optionally `Workers Scripts: Edit`)
+#      permissions to the API token.
+#   2. Run:  wrangler pages deploy docs --project-name guiport --branch main
+#   3. In the Cloudflare dashboard, attach `guiport.dev` + `www.guiport.dev`
+#      as custom domains on the new project.
+#   4. Cloudflare will replace the GitHub-Pages A records with proxied origins
+#      automatically once the custom domain is verified.
+#   5. Remove docs/CNAME and remove the GitHub Pages source under
+#      Settings → Pages.
+#
+name = "guiport"
+compatibility_date = "2026-05-01"
+
+[pages_build_output_dir]
+directory = "./docs"
