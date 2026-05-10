@@ -1,0 +1,22 @@
+# Swift / SPM
+.build/
+.swiftpm/
+Packages/
+xcuserdata/
+*.xcodeproj
+*.xcworkspace
+DerivedData/
+Package.resolved
+
+# macOS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Artifacts
+artifacts/
+*.log
+*.trace
