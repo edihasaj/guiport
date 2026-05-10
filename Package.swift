@@ -36,6 +36,17 @@ let package = Package(
                 "GuiportCore",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .target(name: "GuiportMacAdapter", condition: .when(platforms: [.macOS])),
+            ],
+            // Embed Info.plist so macOS TCC treats guiport as its own subject (Accessibility,
+            // Screen Recording, Apple Events) regardless of the parent terminal. Without this,
+            // CLI tools fall through to the parent's TCC grants — a separate grant per terminal.
+            linkerSettings: [
+                .unsafeFlags([
+                    "-Xlinker", "-sectcreate",
+                    "-Xlinker", "__TEXT",
+                    "-Xlinker", "__info_plist",
+                    "-Xlinker", "Resources/Info.plist",
+                ], .when(platforms: [.macOS]))
             ]
         ),
         .testTarget(

@@ -4,6 +4,11 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-05-10
+
+### Fixed
+- **TCC now tracks guiport as its own subject.** Embedded an `Info.plist` (with `CFBundleIdentifier dev.guiport.cli`, `NSAccessibilityUsageDescription`, `NSScreenCaptureUsageDescription`, `NSAppleEventsUsageDescription`) into the binary's `__TEXT,__info_plist` section via SwiftPM linker flags. Result: granting Screen Recording / Accessibility once for guiport is enough — works from Ghostty, Terminal.app, iTerm, opencode, or any other terminal. Previously TCC fell through to the parent terminal because no usage strings were present.
+
 ## [0.1.1] — 2026-05-10
 
 ### Changed

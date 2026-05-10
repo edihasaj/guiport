@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>dev.guiport.cli</string>
+    <key>CFBundleName</key>
+    <string>guiport</string>
+    <key>CFBundleDisplayName</key>
+    <string>guiport</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.2</string>
+    <key>CFBundleExecutable</key>
+    <string>guiport</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSAccessibilityUsageDescription</key>
+    <string>guiport reads the macOS Accessibility tree of running apps so coding agents can inspect UI structure, click by selector, and replay tests deterministically.</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>guiport captures app windows for screenshots and on-device OCR fallback when an app's accessibility tree is sparse (Electron, canvas, custom-rendered UI).</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>guiport may activate target apps before sending input events so clicks and keystrokes route correctly.</string>
+</dict>
+</plist>
