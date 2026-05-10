@@ -332,20 +332,16 @@ steps:
 <!-- ARCHITECTURE -->
 <section id="arch" class="numbered">
   <span class="num">09</span>
-  <h2>Architecture.</h2>
-  <pre>┌──────────────────────────────────────────────────────────┐
-│  guiport (CLI / MCP server / YAML runner) — agnostic     │
-└────────────────────────────┬─────────────────────────────┘
-                             │  DesktopAdapter protocol
-        ┌────────────────────┼────────────────────┐
-        ▼                    ▼                    ▼
-   MacAdapter          WindowsAdapter         LinuxAdapter
-   Apple AX            UI Automation          AT-SPI2
-   CGEvent             SendInput              libei / XTest
-   Vision OCR          Tesseract              Tesseract
-   <span class="comment">[ shipped ]</span>         <span class="comment">[ roadmap ]</span>           <span class="comment">[ roadmap ]</span></pre>
+  <h2>One contract, every platform.</h2>
+  <pre>            <span class="comment">guiport</span>
+       <span class="comment">CLI · MCP · runner</span>
+              │
+   ┌──────────┼──────────┐
+   ▼          ▼          ▼
+ macOS      Linux     Windows
+ <span class="kw">shipped</span>     <span class="comment">soon</span>      <span class="comment">soon</span></pre>
 
-  <p>One repo, one source tree. Cross-platform code lives in <code>GuiportCore</code>; per-OS code in its own <code>*Adapter</code> target. Adding a platform is implementing one protocol — never branching the YAML schema or MCP tool list.</p>
+  <p>Same selectors, same YAML, same MCP tools — across every platform. New platforms slot in behind one shared contract; your replay tests never know which OS is underneath.</p>
 </section>
 
 <!-- FOOTER -->
