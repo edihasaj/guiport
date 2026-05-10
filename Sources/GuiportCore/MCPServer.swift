@@ -110,8 +110,8 @@ private enum Tools {
         tool(name: "find", desc: "Find elements matching a selector.",
              props: ["app": ["type": "string"], "selector": ["type": "string"], "all": ["type": "boolean"]],
              required: ["selector"]),
-        tool(name: "click", desc: "Click an element matched by selector.",
-             props: ["app": ["type": "string"], "selector": ["type": "string"], "press": ["type": "boolean"]],
+        tool(name: "click", desc: "Click an element matched by selector. `fallback: ocr` enables OCR fallback when AX misses.",
+             props: ["app": ["type": "string"], "selector": ["type": "string"], "press": ["type": "boolean"], "fallback": ["type": "string"]],
              required: ["selector"]),
         tool(name: "click_at", desc: "Click at raw screen coordinates (vision/OCR fallback).",
              props: ["x": ["type": "number"], "y": ["type": "number"], "button": ["type": "string"]],
@@ -160,13 +160,11 @@ private enum Tools {
         case "click":
             guard let sel = args["selector"] as? String else { throw GuiportError(code: "missing_arg", message: "selector required") }
             let target = try AppRegistry.resolve(name: args["app"] as? String, windowTitle: args["window"] as? String)
-            let tree = try AXBridge.tree(target: target, maxDepth: 30, includeHidden: false)
-            let parsed = try Selector.parse(sel)
-            guard let m = parsed.match(tree).first else {
-                throw GuiportError(code: "no_match", message: "selector matched no element")
-            }
             let usePress = (args["press"] as? Bool) ?? false
-            return try JSONOutput.encode(try Input.click(m, app: target, button: "left", count: 1, useAXPress: usePress), pretty: true)
+            let fb = SmartClick.Fallback(rawValue: (args["fallback"] as? String)?.lowercased() ?? "none") ?? .none
+            return try JSONOutput.encode(try SmartClick.click(
+                selector: sel, target: target, useAXPress: usePress, fallback: fb
+            ), pretty: true)
         case "click_at":
             guard let x = (args["x"] as? NSNumber)?.doubleValue,
                   let y = (args["y"] as? NSNumber)?.doubleValue else {

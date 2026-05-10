@@ -12,6 +12,18 @@ public struct Selector {
     public let predicates: [Predicate]
     public let index: Int?
 
+    /// Best-effort OCR query: pick the first text-bearing predicate value.
+    /// `name`, `title`, `text`, `description`, `value` (in that order) — skip identifier/role.
+    public var ocrQuery: String? {
+        let order = ["name", "title", "text", "description", "value"]
+        for key in order {
+            if let p = predicates.first(where: { $0.attr.lowercased() == key }) {
+                return p.value
+            }
+        }
+        return nil
+    }
+
     /// Parse `role[attr=value][attr~="substring"][index]`.
     /// `role` may be `*` or omitted.
     public static func parse(_ input: String) throws -> Selector {

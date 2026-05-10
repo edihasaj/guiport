@@ -110,11 +110,19 @@ public enum Runner {
             return .init(action: "find", detail: sel)
 
         case "click":
-            guard let sel = value as? String else { throw GuiportError(code: "step_parse", message: "click expects a selector") }
+            // Accept "click: selector" or "click: { selector, fallback }".
+            let (sel, fallback) = parseClickStep(value)
             let target = try AppRegistry.resolve(name: appName)
-            let node = try await waitFor(selector: sel, target: target, timeoutMs: timeoutMs)
-            _ = try Input.click(node, app: target, button: "left", count: 1, useAXPress: false)
-            return .init(action: "click", detail: sel)
+            do {
+                let node = try await waitFor(selector: sel, target: target, timeoutMs: timeoutMs)
+                _ = try Input.click(node, app: target, button: "left", count: 1, useAXPress: false)
+                return .init(action: "click", detail: "\(sel) [ax]")
+            } catch let e as GuiportError where e.code == "timeout" && fallback == "ocr" {
+                let result = try SmartClick.click(
+                    selector: sel, target: target, fallback: .ocr
+                )
+                return .init(action: "click", detail: "\(sel) [\(result.path)]")
+            }
 
         case "click_text":
             guard let q = value as? String else { throw GuiportError(code: "step_parse", message: "click_text expects a string query") }
@@ -231,6 +239,16 @@ public enum Runner {
             saved.append("\(prefix)-screen.png")
         }
         return saved
+    }
+
+    private static func parseClickStep(_ value: Any) -> (String, String) {
+        if let s = value as? String { return (s, "none") }
+        if let d = value as? [String: Any] {
+            let sel = (d["selector"] as? String) ?? ""
+            let fb = (d["fallback"] as? String) ?? "none"
+            return (sel, fb)
+        }
+        return ("", "none")
     }
 
     private static func parseCoords(_ value: Any) throws -> (Double, Double) {
