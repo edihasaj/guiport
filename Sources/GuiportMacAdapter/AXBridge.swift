@@ -68,14 +68,54 @@ enum AXBridge {
 
     // MARK: - Tree
 
-    static func tree(target: AppTarget, maxDepth: Int = 30, includeHidden: Bool = false) throws -> AXNode {
+    static func tree(target: AppTarget, maxDepth: Int = 30, includeHidden: Bool = false, scope: TreeScope = .auto) throws -> AXNode {
         try requireTrusted()
         let appElement = AXUIElementCreateApplication(target.pid)
         // Coax Chromium/Electron apps into exposing their full AX tree.
         enableElectronAX(appElement)
-        let root = focusedOrTitledWindow(in: appElement, titleHint: target.windowTitleHint) ?? appElement
+        let root = chooseRoot(appElement: appElement, target: target, scope: scope)
         var pathCounter = PathCounter()
         return walk(root, depth: 0, maxDepth: maxDepth, path: "/", counter: &pathCounter, includeHidden: includeHidden)
+    }
+
+    /// Resolve the AX root the caller wants to walk.
+    /// - `.window`: the focused/titled window (current default behaviour).
+    /// - `.tray`:   the app's menu-bar-extras (NSStatusItem area). Many menu-
+    ///              bar-only apps expose nothing on `AXWindows`; their
+    ///              status items live behind `AXExtrasMenuBar` and are
+    ///              otherwise invisible to AX automation.
+    /// - `.app`:    the raw application element (top of the tree).
+    /// - `.auto`:   window if one exists, otherwise extras menu bar,
+    ///              otherwise the app element.
+    private static func chooseRoot(appElement: AXUIElement, target: AppTarget, scope: TreeScope) -> AXUIElement {
+        switch scope {
+        case .window:
+            return focusedOrTitledWindow(in: appElement, titleHint: target.windowTitleHint) ?? appElement
+        case .tray:
+            return extrasMenuBar(of: appElement) ?? appElement
+        case .app:
+            return appElement
+        case .auto:
+            if let w = focusedOrTitledWindow(in: appElement, titleHint: target.windowTitleHint),
+               windowCount(pid: target.pid) > 0 {
+                return w
+            }
+            if let extras = extrasMenuBar(of: appElement) {
+                return extras
+            }
+            return appElement
+        }
+    }
+
+    /// Returns the `AXMenuBar` that hosts the app's NSStatusItems. macOS
+    /// 13+ exposes it on the application element as `AXExtrasMenuBar`.
+    /// Falls back to nil for apps that don't host status items.
+    static func extrasMenuBar(of appElement: AXUIElement) -> AXUIElement? {
+        var ref: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(appElement, "AXExtrasMenuBar" as CFString, &ref) == .success,
+              let bar = ref as! AXUIElement?
+        else { return nil }
+        return bar
     }
 
     /// Some Electron/Chromium apps gate their full AX tree behind `AXManualAccessibility` /
@@ -88,12 +128,28 @@ enum AXBridge {
     }
 
     /// Find the AXUIElement matching a stable id from a previous tree walk. O(tree).
+    /// Tries the window root first (legacy default), then the extras menu
+    /// bar (NSStatusItem area), then the bare app element — so click()
+    /// resolves nodes that were enumerated under any scope `tree()` may
+    /// have used (window vs `--tray`).
     static func locate(in target: AppTarget, id: String) throws -> AXUIElement? {
         try requireTrusted()
         let appElement = AXUIElementCreateApplication(target.pid)
-        let root = focusedOrTitledWindow(in: appElement, titleHint: target.windowTitleHint) ?? appElement
-        var counter = PathCounter()
-        return walkRaw(root, depth: 0, maxDepth: 60, path: "/", counter: &counter, target: id)
+        var roots: [AXUIElement] = []
+        if let w = focusedOrTitledWindow(in: appElement, titleHint: target.windowTitleHint) {
+            roots.append(w)
+        }
+        if let extras = extrasMenuBar(of: appElement) {
+            roots.append(extras)
+        }
+        roots.append(appElement)
+        for root in roots {
+            var counter = PathCounter()
+            if let hit = walkRaw(root, depth: 0, maxDepth: 60, path: "/", counter: &counter, target: id) {
+                return hit
+            }
+        }
+        return nil
     }
 
     // MARK: - Internals

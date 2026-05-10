@@ -22,17 +22,21 @@ struct ClickCommand: AsyncParsableCommand {
     @Flag(name: .long, help: "Disable visual fallback — fail loud if AX selector misses.")
     var strict: Bool = false
 
+    @Flag(name: .long, help: "Click an item in the app's menu-bar-extras (NSStatusItem tray) instead of a window.")
+    var tray: Bool = false
+
     @Argument(help: "Selector, e.g. `button[name=\"Save\"]`.")
     var selector: String
 
     func run() async throws {
         let target = try Adapter.current.resolveApp(name: app.app, windowTitle: app.window)
         let mode: SmartClick.Mode = strict ? .strict : .auto
+        let scope: TreeScope = tray ? .tray : .auto
         do {
             let result = try SmartClick.click(
                 selector: selector, target: target,
                 button: button, count: count,
-                useAXPress: press, mode: mode
+                useAXPress: press, mode: mode, scope: scope
             )
             try JSONOutput.print(result, pretty: output.pretty)
         } catch let e as GuiportError {

@@ -22,11 +22,12 @@ public enum SmartClick {
                              button: String = "left",
                              count: Int = 1,
                              useAXPress: Bool = false,
-                             mode: Mode = .auto) throws -> SmartClickResult {
+                             mode: Mode = .auto,
+                             scope: TreeScope = .auto) throws -> SmartClickResult {
         let parsed = try Selector.parse(selector)
 
         // Try AX first.
-        let tree = try TreeCache.shared.tree(target: target, maxDepth: 30, includeHidden: false)
+        let tree = try TreeCache.shared.tree(target: target, maxDepth: 30, includeHidden: false, scope: scope)
         if let m = parsed.match(tree).first {
             _ = try Adapter.current.click(node: m, app: target, button: button, count: count, useAXPress: useAXPress)
             TreeCache.shared.invalidate(pid: target.pid)

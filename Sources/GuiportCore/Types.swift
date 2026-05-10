@@ -45,6 +45,22 @@ public struct AppTarget: Sendable {
     }
 }
 
+/// Which AX root the caller wants to walk for an app. Menu-bar-only apps
+/// (OneDrive, Drive, EUnifyer Desktop, etc.) expose their NSStatusItems
+/// under `AXExtrasMenuBar`, not under any `AXWindow`. Without explicitly
+/// asking for `.tray`, tree/find/click would return nothing useful for
+/// those apps.
+public enum TreeScope: String, Sendable {
+    /// Window if any, else extras menu bar, else app element.
+    case auto
+    /// Focused or titled window (legacy default).
+    case window
+    /// AXExtrasMenuBar — the system status-bar items hosted by the app.
+    case tray
+    /// Raw application element.
+    case app
+}
+
 // MARK: - AX
 
 public struct WindowInfo: Encodable, Sendable {

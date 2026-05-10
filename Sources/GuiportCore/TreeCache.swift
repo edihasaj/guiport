@@ -19,6 +19,7 @@ public final class TreeCache: @unchecked Sendable {
         let windowKey: String
         let maxDepth: Int
         let includeHidden: Bool
+        let scope: String
     }
 
     private var entries: [Key: Entry] = [:]
@@ -26,12 +27,13 @@ public final class TreeCache: @unchecked Sendable {
 
     public init() {}
 
-    public func tree(target: AppTarget, maxDepth: Int, includeHidden: Bool) throws -> AXNode {
+    public func tree(target: AppTarget, maxDepth: Int, includeHidden: Bool, scope: TreeScope = .auto) throws -> AXNode {
         let key = Key(
             pid: target.pid,
             windowKey: target.windowTitleHint ?? "",
             maxDepth: maxDepth,
-            includeHidden: includeHidden
+            includeHidden: includeHidden,
+            scope: scope.rawValue
         )
 
         lock.lock()
@@ -43,7 +45,7 @@ public final class TreeCache: @unchecked Sendable {
         misses += 1
         lock.unlock()
 
-        let fresh = try Adapter.current.tree(target: target, maxDepth: maxDepth, includeHidden: includeHidden)
+        let fresh = try Adapter.current.tree(target: target, maxDepth: maxDepth, includeHidden: includeHidden, scope: scope)
         lock.lock()
         entries[key] = Entry(tree: fresh, storedAt: Date())
         lock.unlock()

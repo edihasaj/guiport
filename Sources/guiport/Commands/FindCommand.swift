@@ -22,16 +22,20 @@ struct FindCommand: AsyncParsableCommand {
     @Flag(name: .long, help: "Disable visual fallback — return [] if AX selector misses.")
     var strict: Bool = false
 
+    @Flag(name: .long, help: "Search the app's menu-bar-extras (NSStatusItem tray) instead of a window.")
+    var tray: Bool = false
+
     @Argument(help: "Selector, e.g. `button[name=\"Save\"]`.")
     var selector: String
 
     func run() async throws {
         let target = try Adapter.current.resolveApp(name: app.app, windowTitle: app.window)
         let parsed = try Selector.parse(selector)
+        let scope: TreeScope = tray ? .tray : .auto
 
         let tree = noCache
-            ? try Adapter.current.tree(target: target, maxDepth: maxDepth, includeHidden: false)
-            : try TreeCache.shared.tree(target: target, maxDepth: maxDepth, includeHidden: false)
+            ? try Adapter.current.tree(target: target, maxDepth: maxDepth, includeHidden: false, scope: scope)
+            : try TreeCache.shared.tree(target: target, maxDepth: maxDepth, includeHidden: false, scope: scope)
 
         struct Hit: Encodable { let path: String; let node: AXNode? ; let ocr: OCRMatch? }
         var hits: [Hit] = parsed.match(tree).map { Hit(path: "ax", node: $0, ocr: nil) }

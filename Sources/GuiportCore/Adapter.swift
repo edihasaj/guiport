@@ -36,7 +36,7 @@ public protocol DesktopAdapter: Sendable {
     // MARK: - AX inspection
 
     func observe(target: AppTarget) throws -> AXSummary
-    func tree(target: AppTarget, maxDepth: Int, includeHidden: Bool) throws -> AXNode
+    func tree(target: AppTarget, maxDepth: Int, includeHidden: Bool, scope: TreeScope) throws -> AXNode
 
     // MARK: - Input
 
@@ -65,7 +65,10 @@ public extension DesktopAdapter {
         try clickAt(x: x, y: y, button: "left", count: 1)
     }
     func tree(target: AppTarget) throws -> AXNode {
-        try tree(target: target, maxDepth: 30, includeHidden: false)
+        try tree(target: target, maxDepth: 30, includeHidden: false, scope: .auto)
+    }
+    func tree(target: AppTarget, maxDepth: Int, includeHidden: Bool) throws -> AXNode {
+        try tree(target: target, maxDepth: maxDepth, includeHidden: includeHidden, scope: .auto)
     }
 }
 
@@ -106,7 +109,7 @@ public struct UnconfiguredAdapter: DesktopAdapter {
     public func windowCount(pid: Int32) -> Int { 0 }
 
     public func observe(target: AppTarget) throws -> AXSummary { throw unsupported("observe") }
-    public func tree(target: AppTarget, maxDepth: Int, includeHidden: Bool) throws -> AXNode { throw unsupported("tree") }
+    public func tree(target: AppTarget, maxDepth: Int, includeHidden: Bool, scope: TreeScope) throws -> AXNode { throw unsupported("tree") }
 
     public func click(node: AXNode, app: AppTarget, button: String, count: Int, useAXPress: Bool) throws -> InputResult {
         throw unsupported("click")

@@ -57,8 +57,8 @@ public struct MacAdapter: DesktopAdapter {
         try AXBridge.observe(target: target)
     }
 
-    public func tree(target: AppTarget, maxDepth: Int, includeHidden: Bool) throws -> AXNode {
-        try AXBridge.tree(target: target, maxDepth: maxDepth, includeHidden: includeHidden)
+    public func tree(target: AppTarget, maxDepth: Int, includeHidden: Bool, scope: TreeScope) throws -> AXNode {
+        try AXBridge.tree(target: target, maxDepth: maxDepth, includeHidden: includeHidden, scope: scope)
     }
 
     // MARK: - Input
