@@ -1,6 +1,19 @@
-# guiport
+<p align="center">
+  <img src="assets/icon.svg" width="160" alt="guiport icon"/>
+</p>
 
-> Playwright for desktop apps, built for coding agents.
+<h1 align="center">guiport</h1>
+
+<p align="center"><em>Playwright for desktop apps, built for coding agents.</em></p>
+
+<p align="center">
+  <a href="https://github.com/edihasaj/guiport/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/edihasaj/guiport/actions/workflows/ci.yml/badge.svg"/></a>
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg"/>
+  <img alt="Platform" src="https://img.shields.io/badge/platform-macOS%2013%2B-black"/>
+  <img alt="Swift" src="https://img.shields.io/badge/swift-5.9%2B-orange"/>
+</p>
+
+---
 
 A fast CLI/MCP control layer that lets agents like Claude, Codex, opencode, and Gemini inspect and operate desktop apps through structured UI data, then save successful flows as replayable tests.
 

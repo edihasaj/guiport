@@ -1,0 +1,40 @@
+<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="guiport">
+  <title>guiport</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0F1730"/>
+      <stop offset="1" stop-color="#070B16"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFC857"/>
+      <stop offset="1" stop-color="#F5A524"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Base -->
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+  <rect x="32" y="32" width="960" height="960" rx="208" fill="none" stroke="#1B2438" stroke-width="2"/>
+
+  <!-- Window frame -->
+  <g transform="translate(176,236)">
+    <rect width="672" height="464" rx="64" fill="#0B1220" stroke="#E9E5D4" stroke-width="22"/>
+    <!-- Title bar -->
+    <path d="M0 110 H672" stroke="#E9E5D4" stroke-width="22"/>
+    <!-- Traffic dots -->
+    <circle cx="56"  cy="55" r="14" fill="url(#amber)"/>
+    <circle cx="104" cy="55" r="14" fill="#E9E5D4" opacity="0.45"/>
+    <circle cx="152" cy="55" r="14" fill="#E9E5D4" opacity="0.22"/>
+    <!-- Prompt glyph: > _ -->
+    <g fill="url(#amber)" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-weight="800">
+      <text x="220" y="332" font-size="190">&gt;</text>
+      <rect x="380" y="316" width="148" height="28" rx="6"/>
+    </g>
+  </g>
+
+  <!-- Plug pins below the window -->
+  <g fill="url(#amber)">
+    <rect x="402" y="724" width="36" height="108" rx="10"/>
+    <rect x="494" y="724" width="36" height="108" rx="10"/>
+    <rect x="586" y="724" width="36" height="108" rx="10"/>
+  </g>
+</svg>
