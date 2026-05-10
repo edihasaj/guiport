@@ -22,7 +22,7 @@ struct ClickAtCommand: AsyncParsableCommand {
     var y: Double
 
     func run() async throws {
-        let result = try Input.clickAt(x: x, y: y, button: button, count: count)
+        let result = try Adapter.current.clickAt(x: x, y: y, button: button, count: count)
         try JSONOutput.print(result, pretty: output.pretty)
     }
 }

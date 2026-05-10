@@ -16,7 +16,7 @@ struct TypeCommand: AsyncParsableCommand {
     var text: String
 
     func run() async throws {
-        let result = try Input.type(text, perCharDelayMs: delayMs)
+        let result = try Adapter.current.type(text: text, perCharDelayMs: delayMs)
         try JSONOutput.print(result, pretty: output.pretty)
     }
 }

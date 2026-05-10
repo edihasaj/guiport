@@ -141,25 +141,25 @@ private enum Tools {
             return try JSONOutput.encode(Doctor.checkAll(), pretty: true)
         case "apps":
             let withWindows = (args["with_windows"] as? Bool) ?? false
-            return try JSONOutput.encode(try AppRegistry.list(onlyWithWindows: withWindows), pretty: true)
+            return try JSONOutput.encode(try Adapter.current.listApps(onlyWithWindows: withWindows), pretty: true)
         case "observe":
-            let target = try AppRegistry.resolve(name: args["app"] as? String, windowTitle: args["window"] as? String)
-            return try JSONOutput.encode(try AXBridge.observe(target: target), pretty: true)
+            let target = try Adapter.current.resolveApp(name: args["app"] as? String, windowTitle: args["window"] as? String)
+            return try JSONOutput.encode(try Adapter.current.observe(target: target), pretty: true)
         case "tree":
-            let target = try AppRegistry.resolve(name: args["app"] as? String, windowTitle: args["window"] as? String)
+            let target = try Adapter.current.resolveApp(name: args["app"] as? String, windowTitle: args["window"] as? String)
             let depth = (args["max_depth"] as? Int) ?? 30
-            return try JSONOutput.encode(try AXBridge.tree(target: target, maxDepth: depth, includeHidden: false), pretty: true)
+            return try JSONOutput.encode(try Adapter.current.tree(target: target, maxDepth: depth, includeHidden: false), pretty: true)
         case "find":
             guard let sel = args["selector"] as? String else { throw GuiportError(code: "missing_arg", message: "selector required") }
-            let target = try AppRegistry.resolve(name: args["app"] as? String, windowTitle: args["window"] as? String)
-            let tree = try AXBridge.tree(target: target, maxDepth: 30, includeHidden: false)
+            let target = try Adapter.current.resolveApp(name: args["app"] as? String, windowTitle: args["window"] as? String)
+            let tree = try Adapter.current.tree(target: target, maxDepth: 30, includeHidden: false)
             let parsed = try Selector.parse(sel)
             let all = (args["all"] as? Bool) ?? false
             let nodes = parsed.match(tree)
             return try JSONOutput.encode(all ? nodes : Array(nodes.prefix(1)), pretty: true)
         case "click":
             guard let sel = args["selector"] as? String else { throw GuiportError(code: "missing_arg", message: "selector required") }
-            let target = try AppRegistry.resolve(name: args["app"] as? String, windowTitle: args["window"] as? String)
+            let target = try Adapter.current.resolveApp(name: args["app"] as? String, windowTitle: args["window"] as? String)
             let usePress = (args["press"] as? Bool) ?? false
             let fb = SmartClick.Fallback(rawValue: (args["fallback"] as? String)?.lowercased() ?? "none") ?? .none
             return try JSONOutput.encode(try SmartClick.click(
@@ -171,35 +171,35 @@ private enum Tools {
                 throw GuiportError(code: "missing_arg", message: "x and y required")
             }
             let button = (args["button"] as? String) ?? "left"
-            return try JSONOutput.encode(try Input.clickAt(x: x, y: y, button: button), pretty: true)
+            return try JSONOutput.encode(try Adapter.current.clickAt(x: x, y: y, button: button, count: 1), pretty: true)
         case "find_text":
             guard let q = args["query"] as? String else { throw GuiportError(code: "missing_arg", message: "query required") }
             let target: AppTarget? = (args["app"] as? String) != nil
-                ? try AppRegistry.resolve(name: args["app"] as? String, windowTitle: args["window"] as? String) : nil
+                ? try Adapter.current.resolveApp(name: args["app"] as? String, windowTitle: args["window"] as? String) : nil
             let exact = (args["exact"] as? Bool) ?? false
             let limit = (args["limit"] as? Int) ?? 10
-            return try JSONOutput.encode(try OCR.findText(in: target, query: q, exact: exact, limit: limit), pretty: true)
+            return try JSONOutput.encode(try Adapter.current.findText(in: target, query: q, exact: exact, limit: limit), pretty: true)
         case "click_text":
             guard let q = args["query"] as? String else { throw GuiportError(code: "missing_arg", message: "query required") }
             let target: AppTarget? = (args["app"] as? String) != nil
-                ? try AppRegistry.resolve(name: args["app"] as? String, windowTitle: args["window"] as? String) : nil
+                ? try Adapter.current.resolveApp(name: args["app"] as? String, windowTitle: args["window"] as? String) : nil
             let exact = (args["exact"] as? Bool) ?? false
-            let matches = try OCR.findText(in: target, query: q, exact: exact, limit: 1)
+            let matches = try Adapter.current.findText(in: target, query: q, exact: exact, limit: 1)
             guard let m = matches.first else { throw GuiportError(code: "ocr_no_match", message: "OCR did not find: \(q)") }
-            _ = try Input.clickAt(x: m.centerX, y: m.centerY)
+            _ = try Adapter.current.clickAt(x: m.centerX, y: m.centerY, button: "left", count: 1)
             return try JSONOutput.encode(m, pretty: true)
         case "type":
             guard let text = args["text"] as? String else { throw GuiportError(code: "missing_arg", message: "text required") }
             let delay = (args["delay_ms"] as? Int) ?? 0
-            return try JSONOutput.encode(try Input.type(text, perCharDelayMs: delay), pretty: true)
+            return try JSONOutput.encode(try Adapter.current.type(text: text, perCharDelayMs: delay), pretty: true)
         case "hotkey":
             guard let combo = args["combo"] as? String else { throw GuiportError(code: "missing_arg", message: "combo required") }
-            return try JSONOutput.encode(try Input.hotkey(combo), pretty: true)
+            return try JSONOutput.encode(try Adapter.current.hotkey(combo: combo), pretty: true)
         case "screenshot":
             let target: AppTarget? = (args["app"] as? String) != nil ?
-                try AppRegistry.resolve(name: args["app"] as? String, windowTitle: args["window"] as? String) : nil
-            let path = (args["out"] as? String) ?? Screenshot.defaultPath()
-            return try JSONOutput.encode(try Screenshot.capture(target: target, to: path), pretty: true)
+                try Adapter.current.resolveApp(name: args["app"] as? String, windowTitle: args["window"] as? String) : nil
+            let path = (args["out"] as? String) ?? Adapter.current.defaultScreenshotPath()
+            return try JSONOutput.encode(try Adapter.current.captureScreenshot(target: target, to: path), pretty: true)
         case "run":
             guard let path = args["path"] as? String else { throw GuiportError(code: "missing_arg", message: "path required") }
             let dir = (args["artifacts"] as? String) ?? "artifacts"

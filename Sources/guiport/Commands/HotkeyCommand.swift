@@ -13,7 +13,7 @@ struct HotkeyCommand: AsyncParsableCommand {
     var combo: String
 
     func run() async throws {
-        let result = try Input.hotkey(combo)
+        let result = try Adapter.current.hotkey(combo: combo)
         try JSONOutput.print(result, pretty: output.pretty)
     }
 }

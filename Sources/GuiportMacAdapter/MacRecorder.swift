@@ -2,12 +2,13 @@ import ApplicationServices
 import AppKit
 import CoreGraphics
 import Foundation
+import GuiportCore
 
 /// Live recorder using a CGEventTap. Records left-mouse-down events (resolved to AX selectors)
 /// and key events (buffered into `type` steps until a non-printable key flushes).
 /// Stop with Ctrl+C; the YAML is written on graceful shutdown.
-public enum Recorder {
-    public static func record(target: AppTarget, to path: String) throws {
+enum Recorder {
+    static func record(target: AppTarget, to path: String) throws {
         try Doctor.ensureAccessibilityOrThrow()
 
         let session = RecorderSession(target: target, outputPath: path)

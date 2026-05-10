@@ -24,15 +24,15 @@ struct ClickTextCommand: AsyncParsableCommand {
 
     func run() async throws {
         let target: AppTarget? = app.app != nil
-            ? try AppRegistry.resolve(name: app.app, windowTitle: app.window)
+            ? try Adapter.current.resolveApp(name: app.app, windowTitle: app.window)
             : nil
-        let matches = try OCR.findText(in: target, query: query, exact: exact, limit: 1)
+        let matches = try Adapter.current.findText(in: target, query: query, exact: exact, limit: 1)
         guard let m = matches.first else {
             CLIExit.fail(.init(code: "ocr_no_match",
                                message: "no on-screen text matched \"\(query)\"",
                                hint: "try `guiport find-text` to inspect what Vision sees"))
         }
-        _ = try Input.clickAt(x: m.centerX, y: m.centerY, button: button, count: count)
+        _ = try Adapter.current.clickAt(x: m.centerX, y: m.centerY, button: button, count: count)
         try JSONOutput.print(m, pretty: output.pretty)
     }
 }

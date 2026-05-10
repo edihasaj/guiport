@@ -2,18 +2,12 @@ import ApplicationServices
 import AppKit
 import CoreGraphics
 import Foundation
+import GuiportCore
 
-public struct InputResult: Encodable {
-    public let action: String
-    public let ok: Bool
-    public let detail: String?
-    public let target: String?
-}
-
-public enum Input {
+enum Input {
     // MARK: - Click
 
-    public static func click(_ node: AXNode, app: AppTarget, button: String, count: Int, useAXPress: Bool) throws -> InputResult {
+    static func click(_ node: AXNode, app: AppTarget, button: String, count: Int, useAXPress: Bool) throws -> InputResult {
         try Doctor.ensureAccessibilityOrThrow()
         // Activate target app first so events route correctly.
         if let running = NSRunningApplication(processIdentifier: app.pid) {
@@ -46,7 +40,7 @@ public enum Input {
 
     // MARK: - Click at raw coordinates
 
-    public static func clickAt(x: Double, y: Double, button: String = "left", count: Int = 1) throws -> InputResult {
+    static func clickAt(x: Double, y: Double, button: String = "left", count: Int = 1) throws -> InputResult {
         try Doctor.ensureAccessibilityOrThrow()
         let point = CGPoint(x: x, y: y)
         let mb = parseButton(button)
@@ -56,7 +50,7 @@ public enum Input {
         return InputResult(action: "click-at", ok: true, detail: "synthetic at \(Int(x)),\(Int(y))", target: nil)
     }
 
-    public static func type(_ text: String, perCharDelayMs: Int) throws -> InputResult {
+    static func type(_ text: String, perCharDelayMs: Int) throws -> InputResult {
         try Doctor.ensureAccessibilityOrThrow()
         guard let source = CGEventSource(stateID: .hidSystemState) else {
             throw GuiportError(code: "event_source", message: "could not create CGEventSource")
@@ -73,7 +67,7 @@ public enum Input {
 
     // MARK: - Hotkey
 
-    public static func hotkey(_ combo: String) throws -> InputResult {
+    static func hotkey(_ combo: String) throws -> InputResult {
         try Doctor.ensureAccessibilityOrThrow()
         let parts = combo.lowercased().split(separator: "+").map { $0.trimmingCharacters(in: .whitespaces) }
         guard !parts.isEmpty else {

@@ -3,31 +3,25 @@ import CoreGraphics
 import ImageIO
 import AppKit
 import UniformTypeIdentifiers
+import GuiportCore
 
-public struct ScreenshotResult: Encodable {
-    public let path: String
-    public let width: Int
-    public let height: Int
-    public let scope: String
-}
-
-public enum Screenshot {
-    public static func defaultPath() -> String {
+enum Screenshot {
+    static func defaultPath() -> String {
         let ts = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
         let dir = "artifacts"
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         return "\(dir)/screenshot-\(ts).png"
     }
 
-    public static func hasScreenRecordingPermission() -> Bool {
+    static func hasScreenRecordingPermission() -> Bool {
         return CGPreflightScreenCaptureAccess()
     }
 
-    public static func requestScreenRecordingPermission() -> Bool {
+    static func requestScreenRecordingPermission() -> Bool {
         return CGRequestScreenCaptureAccess()
     }
 
-    public static func capture(target: AppTarget?, to path: String) throws -> ScreenshotResult {
+    static func capture(target: AppTarget?, to path: String) throws -> ScreenshotResult {
         try Doctor.ensureScreenRecordingOrThrow()
         if let target {
             return try captureWindow(target: target, to: path)

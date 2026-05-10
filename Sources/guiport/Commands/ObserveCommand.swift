@@ -11,8 +11,8 @@ struct ObserveCommand: AsyncParsableCommand {
     @OptionGroup var output: DualOutputOption
 
     func run() async throws {
-        let target = try AppRegistry.resolve(name: app.app, windowTitle: app.window)
-        let summary = try AXBridge.observe(target: target)
+        let target = try Adapter.current.resolveApp(name: app.app, windowTitle: app.window)
+        let summary = try Adapter.current.observe(target: target)
         if output.json {
             try JSONOutput.print(summary, pretty: output.pretty)
         } else {

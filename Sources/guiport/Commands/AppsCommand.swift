@@ -13,7 +13,7 @@ struct AppsCommand: AsyncParsableCommand {
     @OptionGroup var output: DualOutputOption
 
     func run() async throws {
-        let apps = try AppRegistry.list(onlyWithWindows: withWindows)
+        let apps = try Adapter.current.listApps(onlyWithWindows: withWindows)
         if output.json {
             try JSONOutput.print(apps, pretty: output.pretty)
         } else {

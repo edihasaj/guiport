@@ -17,12 +17,12 @@ struct BenchCommand: AsyncParsableCommand {
     var selector: String = "AXButton"
 
     func run() async throws {
-        let target = try AppRegistry.resolve(name: app.app, windowTitle: app.window)
+        let target = try Adapter.current.resolveApp(name: app.app, windowTitle: app.window)
 
         var observeTimes: [Double] = []
         for _ in 0..<n {
             let t0 = Date()
-            _ = try AXBridge.observe(target: target)
+            _ = try Adapter.current.observe(target: target)
             observeTimes.append(Date().timeIntervalSince(t0) * 1000)
         }
 
@@ -30,7 +30,7 @@ struct BenchCommand: AsyncParsableCommand {
         for _ in 0..<n {
             TreeCache.shared.invalidate(pid: target.pid)
             let t0 = Date()
-            _ = try AXBridge.tree(target: target, maxDepth: 30, includeHidden: false)
+            _ = try Adapter.current.tree(target: target, maxDepth: 30, includeHidden: false)
             treeTimes.append(Date().timeIntervalSince(t0) * 1000)
         }
 

@@ -1,31 +1,10 @@
 import AppKit
 import Foundation
+import GuiportCore
 
-public struct AppInfo: Encodable {
-    public let name: String
-    public let bundleId: String?
-    public let pid: Int32?
-    public let active: Bool
-    public let windowCount: Int
-}
-
-public struct AppTarget {
-    public let name: String
-    public let bundleId: String?
-    public let pid: pid_t
-    public let windowTitleHint: String?
-
-    public init(name: String, bundleId: String?, pid: pid_t, windowTitleHint: String? = nil) {
-        self.name = name
-        self.bundleId = bundleId
-        self.pid = pid
-        self.windowTitleHint = windowTitleHint
-    }
-}
-
-public enum AppRegistry {
+enum AppRegistry {
     /// List running apps with windows. `onlyWithWindows` filters out background apps.
-    public static func list(onlyWithWindows: Bool = false) throws -> [AppInfo] {
+    static func list(onlyWithWindows: Bool = false) throws -> [AppInfo] {
         let workspace = NSWorkspace.shared
         var infos: [AppInfo] = []
         for running in workspace.runningApplications {
@@ -45,7 +24,7 @@ public enum AppRegistry {
     }
 
     /// Resolve an app target. If `name` is nil, uses the frontmost app.
-    public static func resolve(name: String?, windowTitle: String? = nil) throws -> AppTarget {
+    static func resolve(name: String?, windowTitle: String? = nil) throws -> AppTarget {
         let running = NSWorkspace.shared.runningApplications
         if let name {
             let lc = name.lowercased()

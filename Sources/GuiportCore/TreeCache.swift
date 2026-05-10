@@ -15,7 +15,7 @@ public final class TreeCache: @unchecked Sendable {
     }
 
     private struct Key: Hashable {
-        let pid: pid_t
+        let pid: Int32
         let windowKey: String
         let maxDepth: Int
         let includeHidden: Bool
@@ -43,14 +43,14 @@ public final class TreeCache: @unchecked Sendable {
         misses += 1
         lock.unlock()
 
-        let fresh = try AXBridge.tree(target: target, maxDepth: maxDepth, includeHidden: includeHidden)
+        let fresh = try Adapter.current.tree(target: target, maxDepth: maxDepth, includeHidden: includeHidden)
         lock.lock()
         entries[key] = Entry(tree: fresh, storedAt: Date())
         lock.unlock()
         return fresh
     }
 
-    public func invalidate(pid: pid_t? = nil) {
+    public func invalidate(pid: Int32? = nil) {
         lock.lock()
         defer { lock.unlock() }
         if let pid {

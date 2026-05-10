@@ -2,20 +2,12 @@ import AppKit
 import CoreGraphics
 import Foundation
 import Vision
+import GuiportCore
 
-public struct OCRMatch: Encodable {
-    public let text: String
-    public let confidence: Double
-    public let bounds: Bounds
-    /// Center point in screen coordinates — feed straight to clickAt.
-    public let centerX: Double
-    public let centerY: Double
-}
-
-public enum OCR {
+enum OCR {
     /// Find text in the target app's frontmost window using Apple's Vision framework.
     /// Matches default to substring (case-insensitive). Pass `exact: true` to require equality.
-    public static func findText(in target: AppTarget?,
+    static func findText(in target: AppTarget?,
                                 query: String,
                                 exact: Bool = false,
                                 limit: Int = 10) throws -> [OCRMatch] {

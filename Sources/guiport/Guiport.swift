@@ -1,6 +1,10 @@
 import ArgumentParser
 import GuiportCore
 
+#if canImport(GuiportMacAdapter)
+import GuiportMacAdapter
+#endif
+
 @main
 struct Guiport: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
@@ -27,4 +31,30 @@ struct Guiport: AsyncParsableCommand {
         ],
         defaultSubcommand: nil
     )
+
+    /// Install the platform adapter once per process before any subcommand runs.
+    static func main() async {
+        installAdapter()
+        await Self._mainAsync()
+    }
+
+    private static func installAdapter() {
+        #if canImport(GuiportMacAdapter)
+        Adapter.install(MacAdapter())
+        #endif
+    }
+
+    /// Re-implement ArgumentParser's async entry point so we can hook adapter install above.
+    private static func _mainAsync() async {
+        do {
+            var cmd = try parseAsRoot(nil)
+            if var asyncCmd = cmd as? AsyncParsableCommand {
+                try await asyncCmd.run()
+            } else {
+                try cmd.run()
+            }
+        } catch {
+            exit(withError: error)
+        }
+    }
 }

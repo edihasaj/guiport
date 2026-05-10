@@ -21,9 +21,9 @@ struct FindTextCommand: AsyncParsableCommand {
 
     func run() async throws {
         let target: AppTarget? = app.app != nil
-            ? try AppRegistry.resolve(name: app.app, windowTitle: app.window)
+            ? try Adapter.current.resolveApp(name: app.app, windowTitle: app.window)
             : nil
-        let matches = try OCR.findText(in: target, query: query, exact: exact, limit: limit)
+        let matches = try Adapter.current.findText(in: target, query: query, exact: exact, limit: limit)
         try JSONOutput.print(matches, pretty: output.pretty)
     }
 }

@@ -105,17 +105,17 @@ public enum Runner {
 
         case "find":
             guard let sel = value as? String else { throw GuiportError(code: "step_parse", message: "find expects a string selector") }
-            let target = try AppRegistry.resolve(name: appName)
+            let target = try Adapter.current.resolveApp(name: appName)
             try await waitFor(selector: sel, target: target, timeoutMs: timeoutMs)
             return .init(action: "find", detail: sel)
 
         case "click":
             // Accept "click: selector" or "click: { selector, fallback }".
             let (sel, fallback) = parseClickStep(value)
-            let target = try AppRegistry.resolve(name: appName)
+            let target = try Adapter.current.resolveApp(name: appName)
             do {
                 let node = try await waitFor(selector: sel, target: target, timeoutMs: timeoutMs)
-                _ = try Input.click(node, app: target, button: "left", count: 1, useAXPress: false)
+                _ = try Adapter.current.click(node: node, app: target, button: "left", count: 1, useAXPress: false)
                 return .init(action: "click", detail: "\(sel) [ax]")
             } catch let e as GuiportError where e.code == "timeout" && fallback == "ocr" {
                 let result = try SmartClick.click(
@@ -126,18 +126,18 @@ public enum Runner {
 
         case "click_text":
             guard let q = value as? String else { throw GuiportError(code: "step_parse", message: "click_text expects a string query") }
-            let target: AppTarget? = appName != nil ? try AppRegistry.resolve(name: appName) : nil
-            let matches = try OCR.findText(in: target, query: q, exact: false, limit: 1)
+            let target: AppTarget? = appName != nil ? try Adapter.current.resolveApp(name: appName) : nil
+            let matches = try Adapter.current.findText(in: target, query: q, exact: false, limit: 1)
             guard let m = matches.first else {
                 throw GuiportError(code: "ocr_no_match", message: "OCR did not find: \(q)")
             }
-            _ = try Input.clickAt(x: m.centerX, y: m.centerY)
+            _ = try Adapter.current.clickAt(x: m.centerX, y: m.centerY)
             return .init(action: "click_text", detail: q)
 
         case "find_text":
             guard let q = value as? String else { throw GuiportError(code: "step_parse", message: "find_text expects a string query") }
-            let target: AppTarget? = appName != nil ? try AppRegistry.resolve(name: appName) : nil
-            let matches = try OCR.findText(in: target, query: q, exact: false, limit: 1)
+            let target: AppTarget? = appName != nil ? try Adapter.current.resolveApp(name: appName) : nil
+            let matches = try Adapter.current.findText(in: target, query: q, exact: false, limit: 1)
             if matches.isEmpty {
                 throw GuiportError(code: "ocr_no_match", message: "OCR did not find: \(q)")
             }
@@ -146,30 +146,30 @@ public enum Runner {
         case "click_at":
             // Accept either "click_at: [x, y]" or "click_at: {x: 10, y: 20}"
             let (x, y) = try parseCoords(value)
-            _ = try Input.clickAt(x: x, y: y)
+            _ = try Adapter.current.clickAt(x: x, y: y)
             return .init(action: "click_at", detail: "\(Int(x)),\(Int(y))")
 
         case "press":
             guard let sel = value as? String else { throw GuiportError(code: "step_parse", message: "press expects a selector") }
-            let target = try AppRegistry.resolve(name: appName)
+            let target = try Adapter.current.resolveApp(name: appName)
             let node = try await waitFor(selector: sel, target: target, timeoutMs: timeoutMs)
-            _ = try Input.click(node, app: target, button: "left", count: 1, useAXPress: true)
+            _ = try Adapter.current.click(node: node, app: target, button: "left", count: 1, useAXPress: true)
             return .init(action: "press", detail: sel)
 
         case "type":
             guard let text = value as? String else { throw GuiportError(code: "step_parse", message: "type expects a string") }
-            _ = try Input.type(text, perCharDelayMs: 0)
+            _ = try Adapter.current.type(text: text, perCharDelayMs: 0)
             return .init(action: "type", detail: "\(text.count) chars")
 
         case "hotkey":
             guard let combo = value as? String else { throw GuiportError(code: "step_parse", message: "hotkey expects a string") }
-            _ = try Input.hotkey(combo)
+            _ = try Adapter.current.hotkey(combo: combo)
             return .init(action: "hotkey", detail: combo)
 
         case "screenshot":
-            let target: AppTarget? = appName != nil ? try AppRegistry.resolve(name: appName) : nil
-            let path = (value as? String) ?? Screenshot.defaultPath()
-            let r = try Screenshot.capture(target: target, to: path)
+            let target: AppTarget? = appName != nil ? try Adapter.current.resolveApp(name: appName) : nil
+            let path = (value as? String) ?? Adapter.current.defaultScreenshotPath()
+            let r = try Adapter.current.captureScreenshot(target: target, to: path)
             return .init(action: "screenshot", detail: r.path)
 
         case "assert":
@@ -180,7 +180,7 @@ public enum Runner {
                 throw GuiportError(code: "step_parse", message: "assert needs `find: selector`")
             }
             let exists = (dict["exists"] as? Bool) ?? true
-            let target = try AppRegistry.resolve(name: appName)
+            let target = try Adapter.current.resolveApp(name: appName)
             do {
                 _ = try await waitFor(selector: sel, target: target, timeoutMs: timeoutMs)
                 if !exists {
@@ -224,18 +224,18 @@ public enum Runner {
         let prefix = "\(dir)/fail-\(stamp)-step\(stepIndex)-\(action)"
 
         // tree
-        if let appName, let target = try? AppRegistry.resolve(name: appName),
-           let tree = try? AXBridge.tree(target: target),
+        if let appName, let target = try? Adapter.current.resolveApp(name: appName),
+           let tree = try? Adapter.current.tree(target: target),
            let json = try? JSONOutput.encode(tree, pretty: true) {
             let p = "\(prefix)-tree.json"
             try? json.write(toFile: p, atomically: true, encoding: .utf8)
             saved.append(p)
         }
         // screenshot
-        if let appName, let target = try? AppRegistry.resolve(name: appName) {
+        if let appName, let target = try? Adapter.current.resolveApp(name: appName) {
             let p = "\(prefix)-screen.png"
-            if (try? Screenshot.capture(target: target, to: p)) != nil { saved.append(p) }
-        } else if (try? Screenshot.capture(target: nil, to: "\(prefix)-screen.png")) != nil {
+            if (try? Adapter.current.captureScreenshot(target: target, to: p)) != nil { saved.append(p) }
+        } else if (try? Adapter.current.captureScreenshot(target: nil, to: "\(prefix)-screen.png")) != nil {
             saved.append("\(prefix)-screen.png")
         }
         return saved

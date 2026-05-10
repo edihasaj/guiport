@@ -26,11 +26,11 @@ struct FindCommand: AsyncParsableCommand {
     var selector: String
 
     func run() async throws {
-        let target = try AppRegistry.resolve(name: app.app, windowTitle: app.window)
+        let target = try Adapter.current.resolveApp(name: app.app, windowTitle: app.window)
         let parsed = try Selector.parse(selector)
 
         let tree = noCache
-            ? try AXBridge.tree(target: target, maxDepth: maxDepth, includeHidden: false)
+            ? try Adapter.current.tree(target: target, maxDepth: maxDepth, includeHidden: false)
             : try TreeCache.shared.tree(target: target, maxDepth: maxDepth, includeHidden: false)
 
         struct Hit: Encodable { let path: String; let node: AXNode? ; let ocr: OCRMatch? }
@@ -39,7 +39,7 @@ struct FindCommand: AsyncParsableCommand {
 
         if hits.isEmpty, fallback.lowercased() == "ocr", let q = parsed.ocrQuery {
             let limit = all ? 10 : 1
-            let ocr = try OCR.findText(in: target, query: q, exact: false, limit: limit)
+            let ocr = try Adapter.current.findText(in: target, query: q, exact: false, limit: limit)
             hits = ocr.map { Hit(path: "ocr", node: nil, ocr: $0) }
         }
 

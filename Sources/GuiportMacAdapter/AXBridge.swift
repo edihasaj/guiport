@@ -1,52 +1,16 @@
 import ApplicationServices
 import AppKit
 import Foundation
+import GuiportCore
 
-public struct Bounds: Encodable, Equatable {
-    public let x: Double
-    public let y: Double
-    public let width: Double
-    public let height: Double
-}
-
-public struct AXNode: Encodable {
-    public let id: String
-    public let role: String
-    public let subrole: String?
-    public let name: String?
-    public let value: String?
-    public let identifier: String?
-    public let description: String?
-    public let help: String?
-    public let bounds: Bounds?
-    public let enabled: Bool?
-    public let focused: Bool?
-    public let selected: Bool?
-    public let actions: [String]
-    public var children: [AXNode]
-}
-
-public struct WindowInfo: Encodable {
-    public let title: String?
-    public let bounds: Bounds?
-}
-
-public struct AXSummary: Encodable {
-    public let app: AppInfo
-    public let window: WindowInfo?
-    public let focusedRole: String?
-    public let focusedName: String?
-    public let topLevelChildren: Int
-}
-
-public enum AXBridge {
+enum AXBridge {
     // MARK: - Permissions
 
-    public static func isAccessibilityTrusted() -> Bool {
+    static func isAccessibilityTrusted() -> Bool {
         return AXIsProcessTrusted()
     }
 
-    public static func promptAccessibilityIfNeeded() -> Bool {
+    static func promptAccessibilityIfNeeded() -> Bool {
         let key = "AXTrustedCheckOptionPrompt" as CFString
         let opts: CFDictionary = [key: true] as CFDictionary
         return AXIsProcessTrustedWithOptions(opts)
@@ -54,7 +18,7 @@ public enum AXBridge {
 
     // MARK: - App-level
 
-    public static func windowCount(pid: pid_t) -> Int {
+    static func windowCount(pid: pid_t) -> Int {
         let appElement = AXUIElementCreateApplication(pid)
         var value: CFTypeRef?
         let err = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &value)
@@ -64,7 +28,7 @@ public enum AXBridge {
 
     // MARK: - Observe
 
-    public static func observe(target: AppTarget) throws -> AXSummary {
+    static func observe(target: AppTarget) throws -> AXSummary {
         try requireTrusted()
         let appElement = AXUIElementCreateApplication(target.pid)
         let appInfo = AppInfo(
@@ -104,7 +68,7 @@ public enum AXBridge {
 
     // MARK: - Tree
 
-    public static func tree(target: AppTarget, maxDepth: Int = 30, includeHidden: Bool = false) throws -> AXNode {
+    static func tree(target: AppTarget, maxDepth: Int = 30, includeHidden: Bool = false) throws -> AXNode {
         try requireTrusted()
         let appElement = AXUIElementCreateApplication(target.pid)
         // Coax Chromium/Electron apps into exposing their full AX tree.
@@ -124,7 +88,7 @@ public enum AXBridge {
     }
 
     /// Find the AXUIElement matching a stable id from a previous tree walk. O(tree).
-    public static func locate(in target: AppTarget, id: String) throws -> AXUIElement? {
+    static func locate(in target: AppTarget, id: String) throws -> AXUIElement? {
         try requireTrusted()
         let appElement = AXUIElementCreateApplication(target.pid)
         let root = focusedOrTitledWindow(in: appElement, titleHint: target.windowTitleHint) ?? appElement
@@ -269,7 +233,7 @@ public enum AXBridge {
 
     // MARK: - Attribute helpers
 
-    public static func stringAttr(_ element: AXUIElement, _ attr: CFString) -> String? {
+    static func stringAttr(_ element: AXUIElement, _ attr: CFString) -> String? {
         var ref: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, attr, &ref) == .success else { return nil }
         if let s = ref as? String { return s }
@@ -277,7 +241,7 @@ public enum AXBridge {
         return nil
     }
 
-    public static func boolAttr(_ element: AXUIElement, _ attr: CFString) -> Bool? {
+    static func boolAttr(_ element: AXUIElement, _ attr: CFString) -> Bool? {
         var ref: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, attr, &ref) == .success else { return nil }
         if let n = ref as? Bool { return n }
@@ -285,7 +249,7 @@ public enum AXBridge {
         return nil
     }
 
-    public static func bounds(of element: AXUIElement) -> Bounds? {
+    static func bounds(of element: AXUIElement) -> Bounds? {
         var posRef: CFTypeRef?
         var sizeRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &posRef) == .success,
@@ -302,7 +266,7 @@ public enum AXBridge {
         return Bounds(x: Double(pos.x), y: Double(pos.y), width: Double(size.width), height: Double(size.height))
     }
 
-    public static func actions(of element: AXUIElement) -> [String] {
+    static func actions(of element: AXUIElement) -> [String] {
         var ref: CFArray?
         guard AXUIElementCopyActionNames(element, &ref) == .success, let arr = ref as? [String] else { return [] }
         return arr

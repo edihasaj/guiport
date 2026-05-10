@@ -26,7 +26,7 @@ struct ClickCommand: AsyncParsableCommand {
     var selector: String
 
     func run() async throws {
-        let target = try AppRegistry.resolve(name: app.app, windowTitle: app.window)
+        let target = try Adapter.current.resolveApp(name: app.app, windowTitle: app.window)
         let fb = SmartClick.Fallback(rawValue: fallback.lowercased()) ?? .none
         do {
             let result = try SmartClick.click(

@@ -17,8 +17,8 @@ struct TreeCommand: AsyncParsableCommand {
     var includeHidden: Bool = false
 
     func run() async throws {
-        let target = try AppRegistry.resolve(name: app.app, windowTitle: app.window)
-        let tree = try AXBridge.tree(target: target, maxDepth: maxDepth, includeHidden: includeHidden)
+        let target = try Adapter.current.resolveApp(name: app.app, windowTitle: app.window)
+        let tree = try Adapter.current.tree(target: target, maxDepth: maxDepth, includeHidden: includeHidden)
         try JSONOutput.print(tree, pretty: output.pretty)
     }
 }

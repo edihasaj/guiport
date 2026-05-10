@@ -13,7 +13,7 @@ struct RecordCommand: AsyncParsableCommand {
     var path: String
 
     func run() async throws {
-        let target = try AppRegistry.resolve(name: app.app, windowTitle: app.window)
-        try Recorder.record(target: target, to: path)
+        let target = try Adapter.current.resolveApp(name: app.app, windowTitle: app.window)
+        try Adapter.current.startRecording(target: target, to: path)
     }
 }
