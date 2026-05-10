@@ -53,6 +53,11 @@ guiport find --app "Safari" 'button[name="Save"]'    # match selector
 guiport click --app "Safari" 'button[name="Save"]'
 guiport type "hello"
 guiport screenshot --app "Safari" -o safari.png
+
+# Vision fallback for canvas / sparse-AX apps:
+guiport find-text --app "Figma" "Save"               # OCR via Apple Vision
+guiport click-text --app "Figma" "Save"              # OCR + click center
+guiport click-at 420 180                             # raw coordinates
 guiport record smoke.yaml                            # WIP
 guiport run smoke.yaml
 guiport serve --mcp                                  # MCP server over stdio
@@ -73,6 +78,16 @@ AXButton[name~="Open"][index=0]
 ```
 
 Supported attributes: `role`, `name` (title), `value`, `identifier`, `description`, `text` (matches name or value), `index`.
+
+## Vision fallback (canvas / Electron apps)
+
+For apps with sparse or absent accessibility (Figma, custom-rendered editors, hardened Electron), guiport falls back through three layers:
+
+1. **`click-at X Y`** — raw screen coordinates. The agent reads coords off a screenshot.
+2. **`find-text "Save"`** / **`click-text "Save"`** — Apple Vision (`VNRecognizeTextRequest`) OCRs the window and returns bounds + center for matched text. On-device, free, no extra deps.
+3. **LLM vision** — out of scope for MVP; agents can call `screenshot` + their own model to get coords, then `click-at`.
+
+OCR-found bounds drift across font/scale changes, so prefer AX selectors for replay and OCR for exploration.
 
 ## Permissions
 

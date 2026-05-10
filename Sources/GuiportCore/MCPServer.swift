@@ -116,6 +116,12 @@ private enum Tools {
         tool(name: "click_at", desc: "Click at raw screen coordinates (vision/OCR fallback).",
              props: ["x": ["type": "number"], "y": ["type": "number"], "button": ["type": "string"]],
              required: ["x", "y"]),
+        tool(name: "find_text", desc: "OCR-find on-screen text via Apple Vision (canvas/Electron fallback).",
+             props: ["app": ["type": "string"], "query": ["type": "string"], "exact": ["type": "boolean"], "limit": ["type": "integer"]],
+             required: ["query"]),
+        tool(name: "click_text", desc: "OCR-find text and click its center.",
+             props: ["app": ["type": "string"], "query": ["type": "string"], "exact": ["type": "boolean"]],
+             required: ["query"]),
         tool(name: "type", desc: "Type text into the focused element.",
              props: ["text": ["type": "string"], "delay_ms": ["type": "integer"]],
              required: ["text"]),
@@ -168,6 +174,22 @@ private enum Tools {
             }
             let button = (args["button"] as? String) ?? "left"
             return try JSONOutput.encode(try Input.clickAt(x: x, y: y, button: button), pretty: true)
+        case "find_text":
+            guard let q = args["query"] as? String else { throw GuiportError(code: "missing_arg", message: "query required") }
+            let target: AppTarget? = (args["app"] as? String) != nil
+                ? try AppRegistry.resolve(name: args["app"] as? String, windowTitle: args["window"] as? String) : nil
+            let exact = (args["exact"] as? Bool) ?? false
+            let limit = (args["limit"] as? Int) ?? 10
+            return try JSONOutput.encode(try OCR.findText(in: target, query: q, exact: exact, limit: limit), pretty: true)
+        case "click_text":
+            guard let q = args["query"] as? String else { throw GuiportError(code: "missing_arg", message: "query required") }
+            let target: AppTarget? = (args["app"] as? String) != nil
+                ? try AppRegistry.resolve(name: args["app"] as? String, windowTitle: args["window"] as? String) : nil
+            let exact = (args["exact"] as? Bool) ?? false
+            let matches = try OCR.findText(in: target, query: q, exact: exact, limit: 1)
+            guard let m = matches.first else { throw GuiportError(code: "ocr_no_match", message: "OCR did not find: \(q)") }
+            _ = try Input.clickAt(x: m.centerX, y: m.centerY)
+            return try JSONOutput.encode(m, pretty: true)
         case "type":
             guard let text = args["text"] as? String else { throw GuiportError(code: "missing_arg", message: "text required") }
             let delay = (args["delay_ms"] as? Int) ?? 0

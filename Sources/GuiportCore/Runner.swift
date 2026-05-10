@@ -116,6 +116,25 @@ public enum Runner {
             _ = try Input.click(node, app: target, button: "left", count: 1, useAXPress: false)
             return .init(action: "click", detail: sel)
 
+        case "click_text":
+            guard let q = value as? String else { throw GuiportError(code: "step_parse", message: "click_text expects a string query") }
+            let target: AppTarget? = appName != nil ? try AppRegistry.resolve(name: appName) : nil
+            let matches = try OCR.findText(in: target, query: q, exact: false, limit: 1)
+            guard let m = matches.first else {
+                throw GuiportError(code: "ocr_no_match", message: "OCR did not find: \(q)")
+            }
+            _ = try Input.clickAt(x: m.centerX, y: m.centerY)
+            return .init(action: "click_text", detail: q)
+
+        case "find_text":
+            guard let q = value as? String else { throw GuiportError(code: "step_parse", message: "find_text expects a string query") }
+            let target: AppTarget? = appName != nil ? try AppRegistry.resolve(name: appName) : nil
+            let matches = try OCR.findText(in: target, query: q, exact: false, limit: 1)
+            if matches.isEmpty {
+                throw GuiportError(code: "ocr_no_match", message: "OCR did not find: \(q)")
+            }
+            return .init(action: "find_text", detail: q)
+
         case "click_at":
             // Accept either "click_at: [x, y]" or "click_at: {x: 10, y: 20}"
             let (x, y) = try parseCoords(value)
