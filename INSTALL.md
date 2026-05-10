@@ -6,9 +6,9 @@
 |----------|----------------------------------------------------------------|-----------------------------------|
 | macOS    | **Supported** (13+, primary target)                            | Homebrew, install script, source  |
 | Windows  | **Beta** — input/screenshot/apps shipped; UIA tree pending     | PowerShell install script, source |
-| Linux    | **Roadmap** — AT-SPI2 adapter                                  | not installable yet               |
+| Linux    | **Beta** — input/screenshot/apps shipped; AT-SPI2 tree pending | install script, source            |
 
-The macOS path remains the primary target per [`goal.md`](goal.md). Windows ships a day-1 surface (Win32 SendInput, GDI BitBlt/PrintWindow, EnumWindows); UIA-backed tree/observe/find/click-by-selector and WinRT OCR are tracked under the [`windows`](https://github.com/edihasaj/guiport/issues?q=label%3Awindows) label and throw clear `uia_pending` / `ocr_pending` errors today.
+The macOS path remains the primary target per [`goal.md`](goal.md). Windows ships a day-1 surface (Win32 SendInput, GDI BitBlt/PrintWindow, EnumWindows); UIA-backed tree/observe/find/click-by-selector and WinRT OCR are tracked under [`windows`](https://github.com/edihasaj/guiport/issues?q=label%3Awindows). Linux ships the same shape via thin wrappers around `xdotool`/`wmctrl`/`scrot` (X11) and `ydotool`/`grim` (Wayland); AT-SPI2 tree + tesseract OCR are tracked under [`linux`](https://github.com/edihasaj/guiport/issues?q=label%3Alinux). All UIA/AT-SPI/OCR-gated calls throw clear `*_pending` errors today instead of silently failing.
 
 ## macOS
 
@@ -51,13 +51,50 @@ Verify:
 guiport doctor
 ```
 
-## Linux (not yet supported)
+## Linux (beta)
+
+X11 or Wayland session. The installer clones the repo and builds via `swift build -c release`, so a Swift toolchain (e.g. via [swiftly](https://www.swift.org/install/linux/)) must be on PATH.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/edihasaj/guiport/main/scripts/install.sh | sh
 ```
 
-The script will exit with a roadmap message. Track the AT-SPI2 adapter via the [`linux`](https://github.com/edihasaj/guiport/issues?q=label%3Alinux) label.
+### Runtime tooling
+
+guiport shells out to standard desktop tools — install whichever your session uses:
+
+**X11**
+
+```sh
+sudo apt install xdotool wmctrl scrot imagemagick     # Debian/Ubuntu
+sudo dnf install xdotool wmctrl scrot ImageMagick     # Fedora
+sudo pacman -S xdotool wmctrl scrot imagemagick       # Arch
+```
+
+**Wayland**
+
+```sh
+sudo apt install ydotool grim                          # Debian/Ubuntu
+sudo dnf install ydotool grim                          # Fedora
+sudo pacman -S ydotool grim                            # Arch
+sudo systemctl --user enable --now ydotool             # ydotoold needs /dev/uinput access
+```
+
+### What works today
+
+- `guiport apps` — `wmctrl -lpG` on X11 (full window list with pids), `/proc` walk on Wayland (no per-window count).
+- `guiport click-at <x> <y>` — `xdotool mousemove + click` on X11, `ydotool mousemove --absolute + click` on Wayland.
+- `guiport type "..."` — `xdotool type --clearmodifiers --delay <ms> --` / `ydotool type --key-delay <ms> --`.
+- `guiport hotkey ctrl+s` — modifier-aware combo translated to xdotool key names (X11) or `KEY_*` evdev names (Wayland).
+- `guiport screenshot [--app "..."]` — full-screen via scrot/import/grim/gnome-screenshot in priority order; per-window via `import -window <id>` on X11.
+
+### What's pending
+
+`tree`, `observe`, `find`, `click <selector>`, `find-text`, `record`, and per-window screenshots on Wayland — these throw `atspi_pending` (AT-SPI2 D-Bus tree) / `ocr_pending` (tesseract) / `recorder_pending` (evdev/libei) / `wayland_per_window_unsupported` until those backends land. Use `click-at` against known coordinates plus screenshot diffing in the meantime.
+
+### `ydotool` notes
+
+`ydotool` requires the `ydotoold` daemon running with access to `/dev/uinput`. If `SendInput`-style calls fail with "input_failed", confirm the daemon is up (`systemctl --user status ydotool`) and that your user has uinput access.
 
 ## Windows (beta)
 

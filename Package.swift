@@ -9,6 +9,7 @@ let package = Package(
         .library(name: "GuiportCore", targets: ["GuiportCore"]),
         .library(name: "GuiportMacAdapter", targets: ["GuiportMacAdapter"]),
         .library(name: "GuiportWindowsAdapter", targets: ["GuiportWindowsAdapter"]),
+        .library(name: "GuiportLinuxAdapter", targets: ["GuiportLinuxAdapter"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.4.0"),
@@ -34,8 +35,12 @@ let package = Package(
             name: "GuiportWindowsAdapter",
             dependencies: ["GuiportCore"]
         ),
-        // Future: GuiportLinuxAdapter (AT-SPI2 D-Bus).
-        // .target(name: "GuiportLinuxAdapter", dependencies: ["GuiportCore"]),
+        // Linux adapter: shell-out to xdotool/ydotool/wmctrl/grim/scrot for day-1 surface.
+        // AT-SPI2 D-Bus tree is the upgrade path. Sources are #if os(Linux)-guarded.
+        .target(
+            name: "GuiportLinuxAdapter",
+            dependencies: ["GuiportCore"]
+        ),
 
         .executableTarget(
             name: "guiport",
@@ -44,6 +49,7 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .target(name: "GuiportMacAdapter", condition: .when(platforms: [.macOS])),
                 .target(name: "GuiportWindowsAdapter", condition: .when(platforms: [.windows])),
+                .target(name: "GuiportLinuxAdapter", condition: .when(platforms: [.linux])),
             ],
             // Embed Info.plist so macOS TCC treats guiport as its own subject (Accessibility,
             // Screen Recording, Apple Events) regardless of the parent terminal. Without this,

@@ -3,12 +3,12 @@
 </p>
 
 <p align="center"><em>Playwright for desktop apps, built for coding agents.</em></p>
-<p align="center"><strong>macOS shipped · Windows beta · Linux coming.</strong></p>
+<p align="center"><strong>macOS shipped · Windows beta · Linux beta.</strong></p>
 
 <p align="center">
   <a href="https://github.com/edihasaj/guiport/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/edihasaj/guiport/actions/workflows/ci.yml/badge.svg"/></a>
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg"/>
-  <img alt="Platform" src="https://img.shields.io/badge/platform-macOS%2013%2B%20%7C%20Windows%2010%2B-black"/>
+  <img alt="Platform" src="https://img.shields.io/badge/platform-macOS%2013%2B%20%7C%20Windows%2010%2B%20%7C%20Linux-black"/>
   <img alt="Swift" src="https://img.shields.io/badge/swift-5.9%2B-orange"/>
 </p>
 
@@ -21,6 +21,8 @@ A fast CLI/MCP control layer that lets agents like Claude, Codex, opencode, and 
 MVP. macOS is the primary target — Accessibility tree first, screenshots as fallback.
 
 Windows is in beta with a day-1 input/screenshot/apps surface (Win32 SendInput, GDI BitBlt/PrintWindow, EnumWindows). UIA-backed tree/observe/find/click-by-selector and WinRT OCR are pending — they throw a clear `uia_pending` / `ocr_pending` error today. Track progress under the [`windows`](https://github.com/edihasaj/guiport/issues?q=label%3Awindows) label.
+
+Linux is in beta with the same shape: shell-out to `xdotool`/`wmctrl`/`scrot` on X11 and `ydotool`/`grim` on Wayland for input + screenshot, `/proc` + `wmctrl` for app enumeration. AT-SPI2-backed tree/observe/find and tesseract OCR throw `atspi_pending` / `ocr_pending` until those bindings land. Track under [`linux`](https://github.com/edihasaj/guiport/issues?q=label%3Alinux).
 
 ## Why
 
@@ -47,7 +49,13 @@ Windows (beta — input/screenshot/apps; UIA tree pending):
 iwr -useb https://raw.githubusercontent.com/edihasaj/guiport/main/scripts/install.ps1 | iex
 ```
 
-Linux is roadmap — see [INSTALL.md](INSTALL.md).
+Linux (beta — same shape; AT-SPI2 tree pending). Install xdotool+wmctrl+scrot (X11) or ydotool+grim (Wayland), then:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/edihasaj/guiport/main/scripts/install.sh | sh
+```
+
+See [INSTALL.md](INSTALL.md) for full per-platform notes.
 
 ## Quick start
 

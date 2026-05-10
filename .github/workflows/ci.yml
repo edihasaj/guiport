@@ -65,6 +65,35 @@ jobs:
         shell: pwsh
         run: .build\release\guiport.exe --help
 
+  build-linux:
+    name: build (Linux)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Swift
+        uses: SwiftyLab/setup-swift@latest
+        with:
+          swift-version: "5.10"
+
+      - name: Show toolchain
+        run: swift --version
+
+      - name: Cache SPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/org.swift.swiftpm
+            .build
+          key: spm-linux-${{ hashFiles('Package.resolved', 'Package.swift') }}
+          restore-keys: spm-linux-
+
+      - name: Build
+        run: swift build -c release
+
+      - name: Verify CLI loads
+        run: .build/release/guiport --help
+
   lint:
     name: lint (whitespace + filenames)
     runs-on: ubuntu-24.04

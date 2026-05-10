@@ -7,9 +7,14 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 ### Added
 - **Windows beta.** New `GuiportWindowsAdapter` target backed by Win32: `apps` (EnumWindows + QueryFullProcessImageNameW), `click-at` / `type` / `hotkey` (SendInput, Unicode-aware including surrogate pairs), `screenshot` (GDI BitBlt for the virtual desktop, PrintWindow for a specific window). Wired into the executable via `#if os(Windows)`; non-Windows builds compile the target to nothing. CI now builds on `windows-2022` alongside macOS.
 - `scripts/install.ps1` — real PowerShell installer (clones, `swift build -c release`, drops binary in `%LOCALAPPDATA%\Programs\guiport`, adds to user PATH).
+- **Linux beta.** New `GuiportLinuxAdapter` target. Session-aware day-1 surface: `xdotool` + `wmctrl` + `scrot`/`import` on X11, `ydotool` + `grim` on Wayland. `apps` uses `wmctrl -lpG` on X11 and a `/proc` walk on Wayland. All shell-outs go through `Process` with discrete argv (never a shell), so user-supplied titles / type-text are safe even with metacharacters. CI now builds on `ubuntu-24.04` alongside macOS + Windows.
+- `scripts/install.sh` now installs on Linux too (was a roadmap stub before).
 
 ### Pending on Windows
 - UIA-backed `tree` / `observe` / `find` / `click <selector>` and WinRT `find-text` / `record` — these throw `uia_pending` / `ocr_pending` / `recorder_pending` with a roadmap hint until COM/WinRT bindings land.
+
+### Pending on Linux
+- AT-SPI2 D-Bus tree (`observe` / `tree` / `find` / `click <selector>`), tesseract OCR (`find-text`), evdev/libei recorder, and per-window screenshots on Wayland — throw `atspi_pending` / `ocr_pending` / `recorder_pending` / `wayland_per_window_unsupported` until those backends land.
 
 ## [0.1.3] — 2026-05-10
 
