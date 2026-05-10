@@ -1,0 +1,48 @@
+<svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="guiport">
+  <title>guiport</title>
+  <defs>
+    <linearGradient id="logo-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0F1730"/>
+      <stop offset="1" stop-color="#070B16"/>
+    </linearGradient>
+    <linearGradient id="logo-amber" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFC857"/>
+      <stop offset="1" stop-color="#F5A524"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ICON (180x180 at left) -->
+  <g transform="translate(10,10)">
+    <rect width="180" height="180" rx="40" fill="url(#logo-bg)"/>
+    <rect x="6" y="6" width="168" height="168" rx="36" fill="none" stroke="#1B2438"/>
+
+    <!-- Window frame -->
+    <g transform="translate(31,42)">
+      <rect width="118" height="82" rx="11" fill="#0B1220" stroke="#E9E5D4" stroke-width="3.6"/>
+      <line x1="0" y1="20" x2="118" y2="20" stroke="#E9E5D4" stroke-width="3.6"/>
+      <circle cx="10" cy="10" r="2.5" fill="url(#logo-amber)"/>
+      <circle cx="19" cy="10" r="2.5" fill="#E9E5D4" opacity="0.45"/>
+      <circle cx="28" cy="10" r="2.5" fill="#E9E5D4" opacity="0.22"/>
+      <text x="38" y="58"
+            font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+            font-weight="800" font-size="34" fill="url(#logo-amber)">&gt;</text>
+      <rect x="68" y="55" width="26" height="5" rx="1.2" fill="url(#logo-amber)"/>
+    </g>
+
+    <!-- Plug pins -->
+    <g fill="url(#logo-amber)">
+      <rect x="71" y="130" width="6.6" height="19" rx="1.8"/>
+      <rect x="87" y="130" width="6.6" height="19" rx="1.8"/>
+      <rect x="103" y="130" width="6.6" height="19" rx="1.8"/>
+    </g>
+  </g>
+
+  <!-- WORDMARK -->
+  <g transform="translate(220,0)">
+    <text x="0" y="124"
+          font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+          font-weight="800" font-size="116" letter-spacing="-6" fill="#E9E5D4">guiport</text>
+    <!-- Cursor / connector underline -->
+    <rect x="0" y="142" width="488" height="9" rx="1.5" fill="url(#logo-amber)"/>
+  </g>
+</svg>
