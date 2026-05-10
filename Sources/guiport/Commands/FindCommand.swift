@@ -19,9 +19,14 @@ struct FindCommand: AsyncParsableCommand {
     @Argument(help: "Selector, e.g. `button[name=\"Save\"]`.")
     var selector: String
 
+    @Flag(name: .long, help: "Bypass tree cache.")
+    var noCache: Bool = false
+
     func run() async throws {
         let target = try AppRegistry.resolve(name: app.app, windowTitle: app.window)
-        let tree = try AXBridge.tree(target: target, maxDepth: maxDepth, includeHidden: false)
+        let tree = noCache
+            ? try AXBridge.tree(target: target, maxDepth: maxDepth, includeHidden: false)
+            : try TreeCache.shared.tree(target: target, maxDepth: maxDepth, includeHidden: false)
         let parsed = try Selector.parse(selector)
         let matches = parsed.match(tree)
         let result = all ? matches : Array(matches.prefix(1))

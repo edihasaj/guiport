@@ -170,7 +170,9 @@ public enum Runner {
         var lastErr: Error?
         while Date() < deadline {
             do {
-                let tree = try AXBridge.tree(target: target, maxDepth: 30, includeHidden: false)
+                // Force fresh during polling — UI is changing.
+                TreeCache.shared.invalidate(pid: target.pid)
+                let tree = try TreeCache.shared.tree(target: target, maxDepth: 30, includeHidden: false)
                 if let m = parsed.match(tree).first { return m }
             } catch {
                 lastErr = error

@@ -20,6 +20,7 @@ struct Guiport: AsyncParsableCommand {
             RecordCommand.self,
             RunCommand.self,
             ServeCommand.self,
+            BenchCommand.self,
         ],
         defaultSubcommand: nil
     )

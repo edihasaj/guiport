@@ -24,12 +24,14 @@ struct ClickCommand: AsyncParsableCommand {
 
     func run() async throws {
         let target = try AppRegistry.resolve(name: app.app, windowTitle: app.window)
-        let tree = try AXBridge.tree(target: target, maxDepth: 30, includeHidden: false)
+        let tree = try TreeCache.shared.tree(target: target, maxDepth: 30, includeHidden: false)
         let parsed = try Selector.parse(selector)
         guard let match = parsed.match(tree).first else {
             CLIExit.fail(.init(code: "no_match", message: "selector matched no element", hint: "try `guiport find` to inspect"))
         }
         let result = try Input.click(match, app: target, button: button, count: count, useAXPress: press)
+        // UI may have changed; drop cached tree for this app.
+        TreeCache.shared.invalidate(pid: target.pid)
         try JSONOutput.print(result, pretty: output.pretty)
     }
 }
