@@ -27,12 +27,20 @@ Agents shouldn't drive desktop apps by guessing pixels. `guiport` exposes the de
 
 ## Install
 
-Requires macOS 13+ and Swift 5.9+.
+macOS 13+. See [INSTALL.md](INSTALL.md) for full options + platform status.
 
 ```sh
-swift build -c release
-cp .build/release/guiport /usr/local/bin/guiport
+# Homebrew (once tap is published)
+brew tap edihasaj/guiport && brew install guiport
+
+# Or install script
+curl -fsSL https://raw.githubusercontent.com/edihasaj/guiport/main/scripts/install.sh | sh
+
+# Or from source
+swift build -c release && sudo cp .build/release/guiport /usr/local/bin/guiport
 ```
+
+Linux + Windows are roadmap — see [INSTALL.md](INSTALL.md).
 
 ## Quick start
 
