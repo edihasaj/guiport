@@ -1,0 +1,54 @@
+name: Release
+
+# Auto-bumps Version.swift patch on every push to main that *isn't* itself a
+# release commit. Tags + pushes back so each merge produces a real
+# `v0.x.y` we can attach artifacts to without manual bookkeeping.
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    if: "!contains(github.event.head_commit.message, '[skip release]') && !contains(github.event.head_commit.message, 'chore(release):')"
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # PAT/GITHUB_TOKEN won't trigger downstream workflows by default;
+          # we use the default token here because the bump commit is tagged
+          # `chore(release):` and skipped by this same job's guard.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bump patch version in Version.swift
+        id: bump
+        run: |
+          set -euo pipefail
+          file=Sources/GuiportCore/Version.swift
+          current=$(grep -oE '"[0-9]+\.[0-9]+\.[0-9]+"' "$file" | tr -d '"')
+          IFS='.' read -r major minor patch <<<"$current"
+          next="$major.$minor.$((patch + 1))"
+          echo "Bumping $current → $next"
+          sed -i.bak "s/\"$current\"/\"$next\"/" "$file"
+          rm "$file.bak"
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Commit + tag
+        env:
+          NEXT: ${{ steps.bump.outputs.next }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add Sources/GuiportCore/Version.swift
+          git commit -m "chore(release): v${NEXT}"
+          git tag "v${NEXT}"
+          git push origin HEAD:main
+          git push origin "v${NEXT}"
