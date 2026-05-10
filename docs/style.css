@@ -121,8 +121,44 @@ main { position: relative; z-index: 1; max-width: 940px; margin: 0 auto; padding
 .btn.ghost { color: var(--ink); border: 1px solid var(--line); }
 .btn.ghost:hover { border-color: var(--amber); color: var(--amber); }
 
-.badges { color: var(--ink-dim); font-size: 12px; }
-.badges span { margin: 0 8px 0 0; }
+.badges { color: var(--ink-dim); font-size: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.badges span { margin: 0; }
+
+.pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+}
+.pill.ok    { background: rgba(245,165,36,0.14); color: var(--amber-2); border: 1px solid rgba(245,165,36,0.45); }
+.pill.soon  { background: rgba(156,163,181,0.10); color: var(--ink-dim); border: 1px solid var(--line); }
+
+.btn.small { padding: 6px 12px; font-size: 12px; }
+
+/* Platforms */
+.platforms { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 28px 0 0; }
+@media (max-width: 720px) { .platforms { grid-template-columns: 1fr; } }
+.plat {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 18px 20px 22px;
+  display: flex; flex-direction: column;
+}
+.plat-ok { border-left: 3px solid var(--amber); }
+.plat-soon { opacity: 0.85; }
+.plat-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.plat-os { font-weight: 800; font-size: 18px; color: var(--ink); }
+.plat-meta { color: var(--ink-dim); font-size: 12px; margin-bottom: 12px; }
+.plat ul { padding-left: 18px; margin: 0 0 16px; color: var(--ink); font-size: 13.5px; line-height: 1.85; }
+.plat ul li::marker { color: var(--amber); }
+.plat .btn { align-self: flex-start; margin-top: auto; }
+
+/* Logo image needs no min/max — use intrinsic height. */
+.topbar .logo img { display: block; height: 28px; width: auto; }
 
 /* Sections */
 section { padding: 72px 0; }

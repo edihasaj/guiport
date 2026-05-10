@@ -1,10 +1,9 @@
 <p align="center">
-  <img src="assets/icon.svg" width="160" alt="guiport icon"/>
+  <img src="assets/logo.svg" width="520" alt="guiport"/>
 </p>
 
-<h1 align="center">guiport</h1>
-
 <p align="center"><em>Playwright for desktop apps, built for coding agents.</em></p>
+<p align="center"><strong>macOS shipped · Linux + Windows coming.</strong></p>
 
 <p align="center">
   <a href="https://github.com/edihasaj/guiport/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/edihasaj/guiport/actions/workflows/ci.yml/badge.svg"/></a>
