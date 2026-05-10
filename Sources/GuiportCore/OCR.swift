@@ -19,6 +19,7 @@ public enum OCR {
                                 query: String,
                                 exact: Bool = false,
                                 limit: Int = 10) throws -> [OCRMatch] {
+        try Doctor.ensureScreenRecordingOrThrow()
         let (image, frame) = try captureForOCR(target: target)
         return try recognizeText(in: image,
                                  windowFrame: frame,

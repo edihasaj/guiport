@@ -136,9 +136,16 @@ public enum AXBridge {
 
     private static func requireTrusted() throws {
         guard AXIsProcessTrusted() else {
+            // Fire the system prompt + open Settings on the first try; instructive error otherwise.
+            _ = promptAccessibilityIfNeeded()
+            #if canImport(AppKit)
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                _ = NSWorkspace.shared.open(url)
+            }
+            #endif
             throw GuiportError(code: "ax_not_trusted",
-                               message: "Accessibility permission not granted",
-                               hint: "Grant in System Settings → Privacy & Security → Accessibility, then re-run.")
+                               message: "Accessibility permission required",
+                               hint: "System Settings was opened — toggle guiport ON, then re-run.")
         }
     }
 

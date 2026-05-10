@@ -14,10 +14,7 @@ public enum Input {
     // MARK: - Click
 
     public static func click(_ node: AXNode, app: AppTarget, button: String, count: Int, useAXPress: Bool) throws -> InputResult {
-        guard AXBridge.isAccessibilityTrusted() else {
-            throw GuiportError(code: "ax_not_trusted", message: "Accessibility permission not granted",
-                               hint: "Grant in System Settings → Privacy & Security → Accessibility")
-        }
+        try Doctor.ensureAccessibilityOrThrow()
         // Activate target app first so events route correctly.
         if let running = NSRunningApplication(processIdentifier: app.pid) {
             running.activate(options: [])
@@ -50,9 +47,7 @@ public enum Input {
     // MARK: - Click at raw coordinates
 
     public static func clickAt(x: Double, y: Double, button: String = "left", count: Int = 1) throws -> InputResult {
-        guard AXBridge.isAccessibilityTrusted() else {
-            throw GuiportError(code: "ax_not_trusted", message: "Accessibility permission not granted")
-        }
+        try Doctor.ensureAccessibilityOrThrow()
         let point = CGPoint(x: x, y: y)
         let mb = parseButton(button)
         for _ in 0..<max(1, count) {
@@ -62,9 +57,7 @@ public enum Input {
     }
 
     public static func type(_ text: String, perCharDelayMs: Int) throws -> InputResult {
-        guard AXBridge.isAccessibilityTrusted() else {
-            throw GuiportError(code: "ax_not_trusted", message: "Accessibility permission not granted")
-        }
+        try Doctor.ensureAccessibilityOrThrow()
         guard let source = CGEventSource(stateID: .hidSystemState) else {
             throw GuiportError(code: "event_source", message: "could not create CGEventSource")
         }
@@ -81,9 +74,7 @@ public enum Input {
     // MARK: - Hotkey
 
     public static func hotkey(_ combo: String) throws -> InputResult {
-        guard AXBridge.isAccessibilityTrusted() else {
-            throw GuiportError(code: "ax_not_trusted", message: "Accessibility permission not granted")
-        }
+        try Doctor.ensureAccessibilityOrThrow()
         let parts = combo.lowercased().split(separator: "+").map { $0.trimmingCharacters(in: .whitespaces) }
         guard !parts.isEmpty else {
             throw GuiportError(code: "hotkey_empty", message: "empty combo")

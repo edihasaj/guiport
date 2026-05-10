@@ -8,11 +8,7 @@ import Foundation
 /// Stop with Ctrl+C; the YAML is written on graceful shutdown.
 public enum Recorder {
     public static func record(target: AppTarget, to path: String) throws {
-        guard AXBridge.isAccessibilityTrusted() else {
-            throw GuiportError(code: "ax_not_trusted",
-                               message: "Accessibility permission required",
-                               hint: "Grant in System Settings → Privacy & Security → Accessibility")
-        }
+        try Doctor.ensureAccessibilityOrThrow()
 
         let session = RecorderSession(target: target, outputPath: path)
         try session.start()

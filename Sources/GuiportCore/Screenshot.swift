@@ -28,6 +28,7 @@ public enum Screenshot {
     }
 
     public static func capture(target: AppTarget?, to path: String) throws -> ScreenshotResult {
+        try Doctor.ensureScreenRecordingOrThrow()
         if let target {
             return try captureWindow(target: target, to: path)
         }
