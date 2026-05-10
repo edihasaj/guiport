@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>guiport — Playwright for desktop apps, built for coding agents</title>
+<meta name="description" content="Fast CLI/MCP control layer that lets agents like Claude, Codex, opencode, and Gemini inspect and operate macOS apps through structured UI data, then save flows as replayable tests.">
+<meta property="og:title" content="guiport">
+<meta property="og:description" content="Playwright for desktop apps, built for coding agents.">
+<meta property="og:image" content="../assets/icon-512.png">
+<link rel="icon" type="image/svg+xml" href="../assets/icon.svg">
+<link rel="apple-touch-icon" sizes="256x256" href="../assets/icon-256.png">
+<link rel="stylesheet" href="style.css">
+<link rel="preconnect" href="https://fonts.bunny.net">
+<link href="https://fonts.bunny.net/css?family=jetbrains-mono:400,500,700,800&family=fraunces:400,700,900" rel="stylesheet">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="logo" href="./">
+    <img src="../assets/icon.svg" alt="" width="28" height="28">
+    <span>guiport</span>
+  </a>
+  <nav>
+    <a href="#install">install</a>
+    <a href="#quickstart">quick start</a>
+    <a href="#cli">cli</a>
+    <a href="#yaml">yaml</a>
+    <a href="#mcp">mcp</a>
+    <a href="https://github.com/edihasaj/guiport" target="_blank" rel="noreferrer">github ↗</a>
+  </nav>
+</header>
+
+<main>
+
+<!-- HERO -->
+<section class="hero">
+  <p class="kicker">/* desktop-control layer for coding agents */</p>
+  <h1>
+    <span class="prompt">$</span> <span class="brand">guiport</span><span class="cursor">▌</span>
+  </h1>
+  <p class="tagline">Playwright for desktop apps,<br>built for coding agents.</p>
+
+  <pre class="hero-block"><span class="comment"># inspect, control, and replay any macOS app</span>
+guiport observe --app Calculator
+guiport click   --app Calculator <span class="str">'AXButton[identifier="Five"]'</span>
+guiport run     <span class="str">smoke.yaml</span>
+guiport serve   --mcp   <span class="comment"># expose to Claude / Codex / opencode</span></pre>
+
+  <div class="cta">
+    <a class="btn primary" href="#install">[ install ]</a>
+    <a class="btn ghost" href="https://github.com/edihasaj/guiport" target="_blank" rel="noreferrer">[ source ↗ ]</a>
+  </div>
+
+  <p class="badges">
+    <span>macOS 13+</span>
+    <span>·</span>
+    <span>Swift 5.9+</span>
+    <span>·</span>
+    <span>MIT</span>
+    <span>·</span>
+    <span>Apple AX + Vision OCR</span>
+  </p>
+</section>
+
+<!-- WHY -->
+<section id="why" class="numbered">
+  <span class="num">01</span>
+  <h2>Why guiport.</h2>
+  <p>
+    Agents shouldn't drive desktop apps by guessing pixels. <strong>guiport</strong>
+    exposes the desktop as structured data — accessibility tree first, screenshots and
+    OCR only as fallback — so flows are deterministic, replayable, and fast enough to
+    use as test infra.
+  </p>
+
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-num">a.</div>
+      <h3>AX-first.</h3>
+      <p>Stable selectors against the macOS Accessibility tree. <code>~80ms</code> full window walk, <code>~60µs</code> cached find.</p>
+    </div>
+    <div class="card">
+      <div class="card-num">b.</div>
+      <h3>Vision fallback.</h3>
+      <p>When AX is sparse (Electron, canvas), Apple Vision OCR finds text and clicks its center. On-device, free, no extra deps.</p>
+    </div>
+    <div class="card">
+      <div class="card-num">c.</div>
+      <h3>Replay-first.</h3>
+      <p>Record once, replay 10× without an LLM. Failures save tree JSON + screenshot + action log to <code>artifacts/</code>.</p>
+    </div>
+  </div>
+</section>
+
+<!-- INSTALL -->
+<section id="install" class="numbered">
+  <span class="num">02</span>
+  <h2>Install.</h2>
+  <p>Three options. macOS 13+ required. Linux / Windows on the roadmap.</p>
+
+  <div class="install-tabs">
+    <details open>
+      <summary>Homebrew <span class="hint">(recommended once tap is published)</span></summary>
+      <pre>brew tap edihasaj/guiport
+brew install guiport
+guiport doctor</pre>
+    </details>
+    <details>
+      <summary>Install script</summary>
+      <pre>curl -fsSL https://raw.githubusercontent.com/edihasaj/guiport/main/scripts/install.sh | sh</pre>
+    </details>
+    <details>
+      <summary>From source</summary>
+      <pre>git clone https://github.com/edihasaj/guiport.git
+cd guiport
+swift build -c release
+sudo cp .build/release/guiport /usr/local/bin/guiport</pre>
+    </details>
+  </div>
+
+  <div class="callout">
+    <strong>permissions.</strong> guiport needs <em>Accessibility</em> + <em>Screen Recording</em>
+    granted to your terminal. Run <code>guiport doctor --fix</code> to fire the prompts and
+    open the right System Settings panes.
+  </div>
+</section>
+
+<!-- QUICK START -->
+<section id="quickstart" class="numbered">
+  <span class="num">03</span>
+  <h2>Quick start.</h2>
+
+  <h3>List running apps.</h3>
+  <pre>$ guiport apps --with-windows
+Calculator      com.apple.calculator   pid=12345  windows=1
+Finder          com.apple.finder       pid=614    windows=2
+Code            com.microsoft.VSCode   pid=48047  windows=1</pre>
+
+  <h3>Inspect an app's accessibility tree.</h3>
+  <pre>$ guiport tree --app Calculator --pretty | head -20
+{
+  "id": "/AXWindow[0]",
+  "role": "AXWindow",
+  "name": "Calculator",
+  "children": [
+    {
+      "role": "AXButton",
+      "identifier": "Five",
+      "bounds": {"x": 605, "y": 442, "width": 48, "height": 48},
+      "actions": ["AXPress"]
+    }, ...
+  ]
+}</pre>
+
+  <h3>Click by stable selector — not coordinates.</h3>
+  <pre>$ guiport click --app Calculator <span class="str">'AXButton[identifier="Five"]'</span>
+{"path":"ax","selector":"AXButton[identifier=\"Five\"]","detail":"5"}</pre>
+
+  <h3>Sparse AX? Fall back to OCR.</h3>
+  <pre>$ guiport click --app Figma <span class="str">'AXButton[name="Save"]'</span> --fallback ocr
+{"path":"ocr","detail":"Save @ 980,124"}</pre>
+
+  <h3>Record → Replay.</h3>
+  <pre>$ guiport record smoke.yaml --app Calculator
+recording for Calculator — interact with the app, Ctrl+C to stop
+recording saved → smoke.yaml
+
+$ guiport run smoke.yaml
+{"passed":true, "steps":[ ... ]}</pre>
+</section>
+
+<!-- CLI -->
+<section id="cli" class="numbered">
+  <span class="num">04</span>
+  <h2>CLI reference.</h2>
+  <table class="cli-table">
+    <thead><tr><th>command</th><th>does</th></tr></thead>
+    <tbody>
+      <tr><td><code>doctor</code></td><td>Check (or <code>--fix</code>) Accessibility + Screen Recording permissions.</td></tr>
+      <tr><td><code>apps</code></td><td>List running apps with windows.</td></tr>
+      <tr><td><code>observe</code></td><td>Summarize the focused window of an app.</td></tr>
+      <tr><td><code>tree</code></td><td>Dump the accessibility tree as JSON.</td></tr>
+      <tr><td><code>find</code></td><td>Find elements matching a selector. <code>--fallback ocr</code> opt-in.</td></tr>
+      <tr><td><code>click</code></td><td>Click an element matched by selector. <code>--fallback ocr</code>.</td></tr>
+      <tr><td><code>click-at X Y</code></td><td>Click at raw coordinates.</td></tr>
+      <tr><td><code>find-text "..."</code></td><td>OCR-find on-screen text via Apple Vision.</td></tr>
+      <tr><td><code>click-text "..."</code></td><td>OCR-find then click center.</td></tr>
+      <tr><td><code>type "..."</code></td><td>Type Unicode text.</td></tr>
+      <tr><td><code>hotkey cmd+s</code></td><td>Send a hotkey combo.</td></tr>
+      <tr><td><code>screenshot</code></td><td>Capture a window or full screen to PNG.</td></tr>
+      <tr><td><code>record file.yaml</code></td><td>Live recorder via CGEventTap → YAML test.</td></tr>
+      <tr><td><code>run file.yaml</code></td><td>Replay a YAML test.</td></tr>
+      <tr><td><code>serve --mcp</code></td><td>Start a JSON-RPC MCP server over stdio.</td></tr>
+      <tr><td><code>bench</code></td><td>Measure observe / tree / find latency.</td></tr>
+    </tbody>
+  </table>
+  <p>Full help: <code>guiport &lt;command&gt; --help</code>.</p>
+</section>
+
+<!-- SELECTOR -->
+<section id="selector" class="numbered">
+  <span class="num">05</span>
+  <h2>Selector grammar.</h2>
+  <pre><span class="kw">role</span>[<span class="attr">attr</span>=<span class="str">"value"</span>][<span class="attr">attr</span>~=<span class="str">"substring"</span>][<span class="num-inline">index</span>]</pre>
+  <p>Examples:</p>
+  <pre><span class="comment"># Exact match by AX role + name</span>
+button[name=<span class="str">"Save"</span>]
+
+<span class="comment"># Substring match</span>
+AXButton[name~=<span class="str">"Open"</span>]
+
+<span class="comment"># Stable identifier (best — survives layout changes)</span>
+*[identifier=<span class="str">"save_btn"</span>]
+
+<span class="comment"># Pick the third match</span>
+AXMenuItem[name~=<span class="str">"File"</span>][2]</pre>
+
+  <p>Attributes: <code>role</code>, <code>name</code> (title), <code>value</code>, <code>identifier</code>, <code>description</code>, <code>text</code> (any of name/value/description), <code>index</code>.</p>
+  <p>Role aliases: <code>button → AXButton</code>, <code>checkbox → AXCheckBox</code>, <code>textfield → AXTextField</code>, etc.</p>
+</section>
+
+<!-- YAML -->
+<section id="yaml" class="numbered">
+  <span class="num">06</span>
+  <h2>YAML test format.</h2>
+  <pre>name: calculator 5+3=8
+app: Calculator
+timeout_ms: 4000
+steps:
+  - find:   <span class="str">'AXButton[identifier="AllClear"]'</span>
+  - click:  <span class="str">'AXButton[identifier="AllClear"]'</span>
+  - wait:   80
+  - click:  <span class="str">'AXButton[identifier="Five"]'</span>
+  - click:  <span class="str">'AXButton[identifier="Add"]'</span>
+  - click:  <span class="str">'AXButton[identifier="Three"]'</span>
+  - click:  <span class="str">'AXButton[identifier="Equals"]'</span>
+  - assert:
+      find:   <span class="str">'AXStaticText[value~="8"]'</span>
+      exists: true</pre>
+
+  <p>Step types: <code>wait</code> · <code>find</code> · <code>click</code> · <code>press</code> · <code>type</code> · <code>hotkey</code> · <code>screenshot</code> · <code>find_text</code> · <code>click_text</code> · <code>click_at</code> · <code>assert</code>.</p>
+  <p>Failures snapshot the AX tree (JSON) + screenshot + action log into <code>artifacts/fail-*</code> for fast diagnosis.</p>
+</section>
+
+<!-- MCP -->
+<section id="mcp" class="numbered">
+  <span class="num">07</span>
+  <h2>MCP server.</h2>
+  <p>Plug guiport into an MCP-aware agent (Claude Code, opencode, others). One JSON object per line over stdio:</p>
+  <pre>$ guiport serve --mcp
+{"jsonrpc":"2.0","id":1,"method":"initialize"}
+&lt;= {"jsonrpc":"2.0","result":{"protocolVersion":"2024-11-05",...}}
+
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{
+   "name":"click","arguments":{
+     "app":"Calculator",
+     "selector":"AXButton[identifier=\"Five\"]",
+     "fallback":"ocr"
+   }
+}}</pre>
+
+  <p>Tools exposed: <code>doctor</code>, <code>apps</code>, <code>observe</code>, <code>tree</code>, <code>find</code>, <code>click</code> (+ <code>fallback</code>), <code>click_at</code>, <code>find_text</code>, <code>click_text</code>, <code>type</code>, <code>hotkey</code>, <code>screenshot</code>, <code>run</code>.</p>
+</section>
+
+<!-- ARCHITECTURE -->
+<section id="arch" class="numbered">
+  <span class="num">08</span>
+  <h2>Architecture.</h2>
+  <pre>┌──────────────────────────────────────────────────────────┐
+│  guiport (CLI / MCP server / YAML runner) — agnostic     │
+└────────────────────────────┬─────────────────────────────┘
+                             │  DesktopAdapter protocol
+        ┌────────────────────┼────────────────────┐
+        ▼                    ▼                    ▼
+   MacAdapter          WindowsAdapter         LinuxAdapter
+   Apple AX            UI Automation          AT-SPI2
+   CGEvent             SendInput              libei / XTest
+   Vision OCR          Tesseract              Tesseract
+   <span class="comment">[ shipped ]</span>         <span class="comment">[ roadmap ]</span>           <span class="comment">[ roadmap ]</span></pre>
+
+  <p>One repo, one source tree. Cross-platform code lives in <code>GuiportCore</code>; per-OS code in its own <code>*Adapter</code> target. Adding a platform is implementing one protocol — never branching the YAML schema or MCP tool list.</p>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>guiport · MIT · built by <a href="https://edihasaj.com">Edi Hasaj</a> · <a href="https://github.com/edihasaj/guiport">github</a></p>
+</footer>
+
+</main>
+
+<script>
+// Stagger reveal on scroll — single intentional motion moment.
+const io = new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    if (e.isIntersecting) {
+      e.target.classList.add('in');
+      io.unobserve(e.target);
+    }
+  }
+}, { rootMargin: '0px 0px -10% 0px' });
+document.querySelectorAll('.numbered, .hero, .card').forEach(n => io.observe(n));
+</script>
+</body>
+</html>
