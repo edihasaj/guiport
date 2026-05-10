@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test-macos:
+    name: build + test (macOS)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          swift --version
+
+      - name: Cache SPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            .build
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved', 'Package.swift') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Build
+        run: swift build -c release
+
+      - name: Test (unit only — AX/input require a logged-in session)
+        run: swift test --parallel
+
+      - name: Verify CLI loads
+        run: .build/release/guiport --help
+
+  lint:
+    name: lint (whitespace + filenames)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trailing whitespace + tabs
+        run: |
+          ! grep -RIn --include='*.swift' --include='*.md' --include='*.yml' --include='*.yaml' \
+            -P '[ \t]+$' Sources Tests examples .github README.md CHANGELOG.md CONTRIBUTING.md

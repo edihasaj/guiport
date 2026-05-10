@@ -1,0 +1,54 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: ["bug"]
+body:
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      description: "Output of `sw_vers -productVersion`"
+      placeholder: "14.5"
+    validations:
+      required: true
+  - type: input
+    id: guiport
+    attributes:
+      label: guiport version / commit
+      description: "Output of `guiport --version` or `git rev-parse HEAD`"
+    validations:
+      required: true
+  - type: input
+    id: app
+    attributes:
+      label: Target app + version
+      placeholder: "Calculator 13.0 (com.apple.calculator)"
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: "guiport doctor --json"
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      description: "Exact commands you ran. Include the YAML if applicable."
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: "Include any artifacts/ output if available."
+    validations:
+      required: true
