@@ -113,6 +113,9 @@ private enum Tools {
         tool(name: "click", desc: "Click an element matched by selector.",
              props: ["app": ["type": "string"], "selector": ["type": "string"], "press": ["type": "boolean"]],
              required: ["selector"]),
+        tool(name: "click_at", desc: "Click at raw screen coordinates (vision/OCR fallback).",
+             props: ["x": ["type": "number"], "y": ["type": "number"], "button": ["type": "string"]],
+             required: ["x", "y"]),
         tool(name: "type", desc: "Type text into the focused element.",
              props: ["text": ["type": "string"], "delay_ms": ["type": "integer"]],
              required: ["text"]),
@@ -158,6 +161,13 @@ private enum Tools {
             }
             let usePress = (args["press"] as? Bool) ?? false
             return try JSONOutput.encode(try Input.click(m, app: target, button: "left", count: 1, useAXPress: usePress), pretty: true)
+        case "click_at":
+            guard let x = (args["x"] as? NSNumber)?.doubleValue,
+                  let y = (args["y"] as? NSNumber)?.doubleValue else {
+                throw GuiportError(code: "missing_arg", message: "x and y required")
+            }
+            let button = (args["button"] as? String) ?? "left"
+            return try JSONOutput.encode(try Input.clickAt(x: x, y: y, button: button), pretty: true)
         case "type":
             guard let text = args["text"] as? String else { throw GuiportError(code: "missing_arg", message: "text required") }
             let delay = (args["delay_ms"] as? Int) ?? 0

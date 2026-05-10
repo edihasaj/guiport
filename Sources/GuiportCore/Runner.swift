@@ -116,6 +116,12 @@ public enum Runner {
             _ = try Input.click(node, app: target, button: "left", count: 1, useAXPress: false)
             return .init(action: "click", detail: sel)
 
+        case "click_at":
+            // Accept either "click_at: [x, y]" or "click_at: {x: 10, y: 20}"
+            let (x, y) = try parseCoords(value)
+            _ = try Input.clickAt(x: x, y: y)
+            return .init(action: "click_at", detail: "\(Int(x)),\(Int(y))")
+
         case "press":
             guard let sel = value as? String else { throw GuiportError(code: "step_parse", message: "press expects a selector") }
             let target = try AppRegistry.resolve(name: appName)
@@ -206,6 +212,20 @@ public enum Runner {
             saved.append("\(prefix)-screen.png")
         }
         return saved
+    }
+
+    private static func parseCoords(_ value: Any) throws -> (Double, Double) {
+        if let arr = value as? [Any], arr.count == 2 {
+            let x = (arr[0] as? NSNumber)?.doubleValue ?? Double("\(arr[0])") ?? 0
+            let y = (arr[1] as? NSNumber)?.doubleValue ?? Double("\(arr[1])") ?? 0
+            return (x, y)
+        }
+        if let dict = value as? [String: Any] {
+            let x = (dict["x"] as? NSNumber)?.doubleValue ?? 0
+            let y = (dict["y"] as? NSNumber)?.doubleValue ?? 0
+            return (x, y)
+        }
+        throw GuiportError(code: "step_parse", message: "click_at expects [x, y] or {x, y}")
     }
 
     private static func actionLabel(of raw: Any) -> String {

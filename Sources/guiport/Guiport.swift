@@ -14,6 +14,7 @@ struct Guiport: AsyncParsableCommand {
             TreeCommand.self,
             FindCommand.self,
             ClickCommand.self,
+            ClickAtCommand.self,
             TypeCommand.self,
             HotkeyCommand.self,
             ScreenshotCommand.self,

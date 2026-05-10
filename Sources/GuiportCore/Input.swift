@@ -47,6 +47,20 @@ public enum Input {
 
     // MARK: - Type
 
+    // MARK: - Click at raw coordinates
+
+    public static func clickAt(x: Double, y: Double, button: String = "left", count: Int = 1) throws -> InputResult {
+        guard AXBridge.isAccessibilityTrusted() else {
+            throw GuiportError(code: "ax_not_trusted", message: "Accessibility permission not granted")
+        }
+        let point = CGPoint(x: x, y: y)
+        let mb = parseButton(button)
+        for _ in 0..<max(1, count) {
+            try postClick(at: point, button: mb)
+        }
+        return InputResult(action: "click-at", ok: true, detail: "synthetic at \(Int(x)),\(Int(y))", target: nil)
+    }
+
     public static func type(_ text: String, perCharDelayMs: Int) throws -> InputResult {
         guard AXBridge.isAccessibilityTrusted() else {
             throw GuiportError(code: "ax_not_trusted", message: "Accessibility permission not granted")
