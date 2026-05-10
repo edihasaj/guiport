@@ -7,7 +7,7 @@ struct DoctorCommand: AsyncParsableCommand {
         abstract: "Check permissions and environment readiness."
     )
 
-    @OptionGroup var output: OutputOption
+    @OptionGroup var output: DualOutputOption
 
     func run() async throws {
         let report = Doctor.checkAll()

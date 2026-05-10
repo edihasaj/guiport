@@ -10,7 +10,7 @@ struct AppsCommand: AsyncParsableCommand {
     @Flag(name: .long, help: "Include only apps that have at least one window.")
     var withWindows: Bool = false
 
-    @OptionGroup var output: OutputOption
+    @OptionGroup var output: DualOutputOption
 
     func run() async throws {
         let apps = try AppRegistry.list(onlyWithWindows: withWindows)

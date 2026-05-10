@@ -49,7 +49,8 @@ public enum AppRegistry {
         let running = NSWorkspace.shared.runningApplications
         if let name {
             let lc = name.lowercased()
-            let candidates = running.filter { $0.activationPolicy == .regular }
+            // Match the same filter as `apps list` so resolve never finds an app the list omits.
+            let candidates = running.filter { $0.activationPolicy != .prohibited }
             let exactBundle = candidates.first { $0.bundleIdentifier?.lowercased() == lc }
             let exactName = candidates.first { ($0.localizedName ?? "").lowercased() == lc }
             let substring = candidates.first { ($0.localizedName ?? "").lowercased().contains(lc) }

@@ -27,9 +27,9 @@ struct ClickCommand: AsyncParsableCommand {
         let tree = try AXBridge.tree(target: target, maxDepth: 30, includeHidden: false)
         let parsed = try Selector.parse(selector)
         guard let match = parsed.match(tree).first else {
-            CLIExit.fail(.init(code: "no_match", message: "selector matched no element", hint: "try `guiport find` to inspect"), json: output.json)
+            CLIExit.fail(.init(code: "no_match", message: "selector matched no element", hint: "try `guiport find` to inspect"))
         }
         let result = try Input.click(match, app: target, button: button, count: count, useAXPress: press)
-        try JSONOutput.print(result, pretty: output.pretty || !output.json)
+        try JSONOutput.print(result, pretty: output.pretty)
     }
 }

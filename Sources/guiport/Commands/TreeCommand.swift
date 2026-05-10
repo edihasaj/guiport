@@ -19,8 +19,6 @@ struct TreeCommand: AsyncParsableCommand {
     func run() async throws {
         let target = try AppRegistry.resolve(name: app.app, windowTitle: app.window)
         let tree = try AXBridge.tree(target: target, maxDepth: maxDepth, includeHidden: includeHidden)
-        if output.json || true {
-            try JSONOutput.print(tree, pretty: output.pretty || !output.json)
-        }
+        try JSONOutput.print(tree, pretty: output.pretty)
     }
 }

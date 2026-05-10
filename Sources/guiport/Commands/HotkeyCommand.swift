@@ -14,6 +14,6 @@ struct HotkeyCommand: AsyncParsableCommand {
 
     func run() async throws {
         let result = try Input.hotkey(combo)
-        try JSONOutput.print(result, pretty: output.pretty || !output.json)
+        try JSONOutput.print(result, pretty: output.pretty)
     }
 }

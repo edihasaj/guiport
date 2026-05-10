@@ -10,18 +10,25 @@ struct AppOption: ParsableArguments {
     var window: String?
 }
 
+/// Output is always JSON for agent-friendly commands. `--pretty` indents for humans.
 struct OutputOption: ParsableArguments {
-    @Flag(name: .long, help: "Output JSON.")
+    @Flag(name: .long, help: "Pretty-print JSON output (default: compact for piping).")
+    var pretty: Bool = false
+}
+
+/// For commands with a non-JSON human mode (apps, doctor). `--json` switches to JSON.
+struct DualOutputOption: ParsableArguments {
+    @Flag(name: .long, help: "Output JSON instead of human-friendly text.")
     var json: Bool = false
 
-    @Flag(name: .long, help: "Pretty-print JSON output.")
+    @Flag(name: .long, help: "Pretty-print when --json is set.")
     var pretty: Bool = false
 }
 
 enum CLIExit {
-    static func fail(_ err: GuiportError, json: Bool = false) -> Never {
+    static func fail(_ err: GuiportError) -> Never {
         let stderr = FileHandle.standardError
-        if json, let data = try? JSONEncoder().encode(err) {
+        if let data = try? JSONEncoder().encode(err) {
             stderr.write(data)
             stderr.write(Data("\n".utf8))
         } else {

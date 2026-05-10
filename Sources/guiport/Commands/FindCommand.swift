@@ -25,6 +25,6 @@ struct FindCommand: AsyncParsableCommand {
         let parsed = try Selector.parse(selector)
         let matches = parsed.match(tree)
         let result = all ? matches : Array(matches.prefix(1))
-        try JSONOutput.print(result, pretty: output.pretty || !output.json)
+        try JSONOutput.print(result, pretty: output.pretty)
     }
 }

@@ -17,7 +17,7 @@ struct RunCommand: AsyncParsableCommand {
 
     func run() async throws {
         let result = try await Runner.run(path: path, artifactsDir: artifacts)
-        try JSONOutput.print(result, pretty: output.pretty || !output.json)
+        try JSONOutput.print(result, pretty: output.pretty)
         if !result.passed { throw ExitCode(1) }
     }
 }

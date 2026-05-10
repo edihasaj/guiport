@@ -8,7 +8,7 @@ struct ObserveCommand: AsyncParsableCommand {
     )
 
     @OptionGroup var app: AppOption
-    @OptionGroup var output: OutputOption
+    @OptionGroup var output: DualOutputOption
 
     func run() async throws {
         let target = try AppRegistry.resolve(name: app.app, windowTitle: app.window)
