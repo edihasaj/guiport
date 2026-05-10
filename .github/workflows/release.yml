@@ -13,10 +13,9 @@ concurrency:
 
 jobs:
   bump:
-    # Skip our own bump commits (they're pushed by github-actions[bot]
-    # via this very workflow — would otherwise loop). Also honor an
-    # explicit `[skip release]` opt-out in a human commit subject.
-    if: "github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[skip release]')"
+    # Skip our own bump commits (pushed by github-actions[bot] via this
+    # same workflow — would otherwise loop forever).
+    if: "github.actor != 'github-actions[bot]'"
     runs-on: ubuntu-24.04
     permissions:
       contents: write
