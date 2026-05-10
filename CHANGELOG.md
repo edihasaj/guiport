@@ -4,6 +4,15 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-05-10
+
+### Changed
+- **Visual fallback is now automatic.** `click` and `find` fall back to on-screen text matching when an AX selector misses, with no flag needed. If Screen Recording isn't granted, the fallback is silently skipped and the original `no_match` error surfaces with a hint to run `doctor --fix` — no surprise mid-action permission prompts.
+- CLI: `--fallback <enum>` removed; `--strict` flag added for opt-out. Result reports `"path": "ax"` or `"path": "ocr"` so callers know which won.
+- MCP `click` tool: new `strict: bool` arg. Legacy `fallback: "none"` still mapped to strict for back-compat.
+- YAML runner: `click: { selector, strict: true }` for opt-out per step.
+- examples/calculator-smoke.yaml: `AllClear` → `Clear` to match macOS 26 Calculator AX.
+
 ### Added
 - macOS-first MVP: `doctor`, `apps`, `observe`, `tree`, `find`, `click`, `type`, `hotkey`, `screenshot`, `record`, `run`, `serve --mcp`, `bench`.
 - Accessibility-tree-first inspection with stable path-based element IDs.
