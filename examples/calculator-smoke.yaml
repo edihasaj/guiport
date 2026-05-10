@@ -5,8 +5,10 @@ name: calculator 5+3=8
 app: Calculator
 timeout_ms: 4000
 steps:
-  - find: 'AXButton[identifier="Clear"]'
-  - click: 'AXButton[identifier="Clear"]'
+  # macOS Calculator toggles between "Clear" (when digits entered) and "AllClear"
+  # (when display is empty). Substring match handles both.
+  - find: 'AXButton[identifier~="lear"]'
+  - click: 'AXButton[identifier~="lear"]'
   - wait: 80
   - click: 'AXButton[identifier="Five"]'
   - wait: 50
