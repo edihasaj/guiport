@@ -107,9 +107,20 @@ public enum AXBridge {
     public static func tree(target: AppTarget, maxDepth: Int = 30, includeHidden: Bool = false) throws -> AXNode {
         try requireTrusted()
         let appElement = AXUIElementCreateApplication(target.pid)
+        // Coax Chromium/Electron apps into exposing their full AX tree.
+        enableElectronAX(appElement)
         let root = focusedOrTitledWindow(in: appElement, titleHint: target.windowTitleHint) ?? appElement
         var pathCounter = PathCounter()
         return walk(root, depth: 0, maxDepth: maxDepth, path: "/", counter: &pathCounter, includeHidden: includeHidden)
+    }
+
+    /// Some Electron/Chromium apps gate their full AX tree behind `AXManualAccessibility` /
+    /// `AXEnhancedUserInterface`. Setting these attributes is best-effort — non-Chromium apps
+    /// will just ignore them.
+    private static func enableElectronAX(_ appElement: AXUIElement) {
+        let trueRef: CFBoolean = kCFBooleanTrue
+        AXUIElementSetAttributeValue(appElement, "AXManualAccessibility" as CFString, trueRef)
+        AXUIElementSetAttributeValue(appElement, "AXEnhancedUserInterface" as CFString, trueRef)
     }
 
     /// Find the AXUIElement matching a stable id from a previous tree walk. O(tree).

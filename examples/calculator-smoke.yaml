@@ -1,0 +1,21 @@
+# Verifies guiport replay reliability against macOS Calculator.
+# Run: guiport run examples/calculator-smoke.yaml
+# Calculator must be open. Clears state, computes 5 + 3, asserts 8.
+name: calculator 5+3=8
+app: Calculator
+timeout_ms: 4000
+steps:
+  - find: 'AXButton[identifier="AllClear"]'
+  - click: 'AXButton[identifier="AllClear"]'
+  - wait: 80
+  - click: 'AXButton[identifier="Five"]'
+  - wait: 50
+  - click: 'AXButton[identifier="Add"]'
+  - wait: 50
+  - click: 'AXButton[identifier="Three"]'
+  - wait: 50
+  - click: 'AXButton[identifier="Equals"]'
+  - wait: 120
+  - assert:
+      find: 'AXStaticText[value~="8"]'
+      exists: true
