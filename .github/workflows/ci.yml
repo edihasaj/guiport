@@ -40,6 +40,31 @@ jobs:
       - name: Verify CLI loads
         run: .build/release/guiport --help
 
+  build-windows:
+    name: build (Windows)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Swift
+        uses: compnerd/gha-setup-swift@main
+        with:
+          branch: swift-5.10-release
+          tag: 5.10-RELEASE
+
+      - name: Show toolchain
+        shell: pwsh
+        run: |
+          swift --version
+
+      - name: Build
+        shell: pwsh
+        run: swift build -c release
+
+      - name: Verify CLI loads
+        shell: pwsh
+        run: .build\release\guiport.exe --help
+
   lint:
     name: lint (whitespace + filenames)
     runs-on: ubuntu-24.04

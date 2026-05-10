@@ -5,6 +5,10 @@ import GuiportCore
 import GuiportMacAdapter
 #endif
 
+#if canImport(GuiportWindowsAdapter)
+import GuiportWindowsAdapter
+#endif
+
 @main
 struct Guiport: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
@@ -42,6 +46,9 @@ struct Guiport: AsyncParsableCommand {
     private static func installAdapter() {
         #if canImport(GuiportMacAdapter)
         Adapter.install(MacAdapter())
+        #endif
+        #if canImport(GuiportWindowsAdapter) && os(Windows)
+        Adapter.install(WindowsAdapter())
         #endif
     }
 

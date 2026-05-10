@@ -8,6 +8,7 @@ let package = Package(
         .executable(name: "guiport", targets: ["guiport"]),
         .library(name: "GuiportCore", targets: ["GuiportCore"]),
         .library(name: "GuiportMacAdapter", targets: ["GuiportMacAdapter"]),
+        .library(name: "GuiportWindowsAdapter", targets: ["GuiportWindowsAdapter"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.4.0"),
@@ -26,9 +27,15 @@ let package = Package(
             name: "GuiportMacAdapter",
             dependencies: ["GuiportCore"]
         ),
-        // Future: GuiportWindowsAdapter (UIA), GuiportLinuxAdapter (AT-SPI2 D-Bus).
-        // .target(name: "GuiportWindowsAdapter", dependencies: ["GuiportCore"]),
-        // .target(name: "GuiportLinuxAdapter",   dependencies: ["GuiportCore"]),
+        // Windows adapter: Win32 SendInput, GDI BitBlt, EnumWindows. UIA tree pending.
+        // Sources are wrapped in `#if os(Windows)` so the target compiles to nothing on
+        // non-Windows hosts — keeps macOS CI green.
+        .target(
+            name: "GuiportWindowsAdapter",
+            dependencies: ["GuiportCore"]
+        ),
+        // Future: GuiportLinuxAdapter (AT-SPI2 D-Bus).
+        // .target(name: "GuiportLinuxAdapter", dependencies: ["GuiportCore"]),
 
         .executableTarget(
             name: "guiport",
@@ -36,6 +43,7 @@ let package = Package(
                 "GuiportCore",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .target(name: "GuiportMacAdapter", condition: .when(platforms: [.macOS])),
+                .target(name: "GuiportWindowsAdapter", condition: .when(platforms: [.windows])),
             ],
             // Embed Info.plist so macOS TCC treats guiport as its own subject (Accessibility,
             // Screen Recording, Apple Events) regardless of the parent terminal. Without this,
