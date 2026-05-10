@@ -5,8 +5,8 @@ name: calculator 5+3=8
 app: Calculator
 timeout_ms: 4000
 steps:
-  - find: 'AXButton[identifier="AllClear"]'
-  - click: 'AXButton[identifier="AllClear"]'
+  - find: 'AXButton[identifier="Clear"]'
+  - click: 'AXButton[identifier="Clear"]'
   - wait: 80
   - click: 'AXButton[identifier="Five"]'
   - wait: 50

@@ -157,8 +157,8 @@ Code            com.microsoft.VSCode   pid=48047  windows=1</pre>
   <pre>$ guiport click --app Calculator <span class="str">'AXButton[identifier="Five"]'</span>
 {"path":"ax","selector":"AXButton[identifier=\"Five\"]","detail":"5"}</pre>
 
-  <h3>App doesn't expose structure? Fall back to what's on screen.</h3>
-  <pre>$ guiport click --app Figma <span class="str">'AXButton[name="Save"]'</span> --fallback ocr
+  <h3>App doesn't expose structure? Visual fallback is automatic.</h3>
+  <pre>$ guiport click --app Figma <span class="str">'AXButton[name="Save"]'</span>
 {"path":"ocr","detail":"Save @ 980,124"}</pre>
 
   <h3>Record → Replay.</h3>
@@ -181,8 +181,8 @@ $ guiport run smoke.yaml
       <tr><td><code>apps</code></td><td>List running apps with windows.</td></tr>
       <tr><td><code>observe</code></td><td>Summarize the focused window of an app.</td></tr>
       <tr><td><code>tree</code></td><td>Dump the accessibility tree as JSON.</td></tr>
-      <tr><td><code>find</code></td><td>Find elements matching a selector. <code>--fallback ocr</code> opt-in.</td></tr>
-      <tr><td><code>click</code></td><td>Click an element matched by selector. <code>--fallback ocr</code>.</td></tr>
+      <tr><td><code>find</code></td><td>Find elements by selector. Visual fallback automatic; <code>--strict</code> to disable.</td></tr>
+      <tr><td><code>click</code></td><td>Click an element by selector. Visual fallback automatic; <code>--strict</code> to disable.</td></tr>
       <tr><td><code>click-at X Y</code></td><td>Click at raw coordinates.</td></tr>
       <tr><td><code>find-text "..."</code></td><td>OCR-find on-screen text via Apple Vision.</td></tr>
       <tr><td><code>click-text "..."</code></td><td>OCR-find then click center.</td></tr>

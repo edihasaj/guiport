@@ -110,8 +110,8 @@ private enum Tools {
         tool(name: "find", desc: "Find elements matching a selector.",
              props: ["app": ["type": "string"], "selector": ["type": "string"], "all": ["type": "boolean"]],
              required: ["selector"]),
-        tool(name: "click", desc: "Click an element matched by selector. `fallback: ocr` enables OCR fallback when AX misses.",
-             props: ["app": ["type": "string"], "selector": ["type": "string"], "press": ["type": "boolean"], "fallback": ["type": "string"]],
+        tool(name: "click", desc: "Click an element matched by selector. Visual fallback (Apple Vision) kicks in automatically when AX misses and Screen Recording is granted. Pass `strict: true` to disable the fallback.",
+             props: ["app": ["type": "string"], "selector": ["type": "string"], "press": ["type": "boolean"], "strict": ["type": "boolean"]],
              required: ["selector"]),
         tool(name: "click_at", desc: "Click at raw screen coordinates (vision/OCR fallback).",
              props: ["x": ["type": "number"], "y": ["type": "number"], "button": ["type": "string"]],
@@ -161,9 +161,12 @@ private enum Tools {
             guard let sel = args["selector"] as? String else { throw GuiportError(code: "missing_arg", message: "selector required") }
             let target = try Adapter.current.resolveApp(name: args["app"] as? String, windowTitle: args["window"] as? String)
             let usePress = (args["press"] as? Bool) ?? false
-            let fb = SmartClick.Fallback(rawValue: (args["fallback"] as? String)?.lowercased() ?? "none") ?? .none
+            // Back-compat: legacy `fallback: "none"` maps to strict.
+            let strict = (args["strict"] as? Bool)
+                ?? ((args["fallback"] as? String)?.lowercased() == "none")
+            let mode: SmartClick.Mode = strict ? .strict : .auto
             return try JSONOutput.encode(try SmartClick.click(
-                selector: sel, target: target, useAXPress: usePress, fallback: fb
+                selector: sel, target: target, useAXPress: usePress, mode: mode
             ), pretty: true)
         case "click_at":
             guard let x = (args["x"] as? NSNumber)?.doubleValue,

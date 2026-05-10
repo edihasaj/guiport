@@ -4,7 +4,7 @@ import GuiportCore
 struct FindCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "find",
-        abstract: "Find elements matching a selector. Optional OCR fallback for sparse-AX apps."
+        abstract: "Find elements by selector. Visual fallback kicks in automatically when needed."
     )
 
     @OptionGroup var app: AppOption
@@ -19,8 +19,8 @@ struct FindCommand: AsyncParsableCommand {
     @Flag(name: .long, help: "Bypass tree cache.")
     var noCache: Bool = false
 
-    @Option(name: .long, help: "Fallback strategy if AX selector misses (none|ocr).")
-    var fallback: String = "none"
+    @Flag(name: .long, help: "Disable visual fallback — return [] if AX selector misses.")
+    var strict: Bool = false
 
     @Argument(help: "Selector, e.g. `button[name=\"Save\"]`.")
     var selector: String
@@ -37,7 +37,11 @@ struct FindCommand: AsyncParsableCommand {
         var hits: [Hit] = parsed.match(tree).map { Hit(path: "ax", node: $0, ocr: nil) }
         if !all { hits = Array(hits.prefix(1)) }
 
-        if hits.isEmpty, fallback.lowercased() == "ocr", let q = parsed.ocrQuery {
+        // Auto visual fallback when AX misses, Screen Recording is granted, and not strict.
+        if hits.isEmpty, !strict,
+           Adapter.current.hasScreenRecordingPermission(),
+           let q = parsed.ocrQuery
+        {
             let limit = all ? 10 : 1
             let ocr = try Adapter.current.findText(in: target, query: q, exact: false, limit: limit)
             hits = ocr.map { Hit(path: "ocr", node: nil, ocr: $0) }

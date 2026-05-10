@@ -4,7 +4,7 @@ import GuiportCore
 struct ClickCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "click",
-        abstract: "Click an element matched by selector. Optional OCR fallback for sparse-AX apps."
+        abstract: "Click an element by selector. Visual fallback kicks in automatically when needed."
     )
 
     @OptionGroup var app: AppOption
@@ -19,20 +19,20 @@ struct ClickCommand: AsyncParsableCommand {
     @Flag(name: .long, help: "Use AXPress action instead of synthesizing a mouse event.")
     var press: Bool = false
 
-    @Option(name: .long, help: "Fallback strategy if AX selector misses (none|ocr).")
-    var fallback: String = "none"
+    @Flag(name: .long, help: "Disable visual fallback — fail loud if AX selector misses.")
+    var strict: Bool = false
 
     @Argument(help: "Selector, e.g. `button[name=\"Save\"]`.")
     var selector: String
 
     func run() async throws {
         let target = try Adapter.current.resolveApp(name: app.app, windowTitle: app.window)
-        let fb = SmartClick.Fallback(rawValue: fallback.lowercased()) ?? .none
+        let mode: SmartClick.Mode = strict ? .strict : .auto
         do {
             let result = try SmartClick.click(
                 selector: selector, target: target,
                 button: button, count: count,
-                useAXPress: press, fallback: fb
+                useAXPress: press, mode: mode
             )
             try JSONOutput.print(result, pretty: output.pretty)
         } catch let e as GuiportError {
