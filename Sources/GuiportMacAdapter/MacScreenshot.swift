@@ -45,7 +45,9 @@ enum Screenshot {
 
     private static func captureWindow(target: AppTarget, to path: String) throws -> ScreenshotResult {
         guard let info = topWindowInfo(for: target.pid, titleHint: target.windowTitleHint) else {
-            throw GuiportError(code: "no_window", message: "could not find a window for \(target.name)")
+            throw GuiportError(code: "no_window",
+                               message: "could not find a window for \(target.name)",
+                               hint: "menu-bar-only apps (EUnifyer, OneDrive, etc.) have no window — try `guiport tree --app \(target.name) --tray` to inspect their status item, or omit --app to screenshot the whole screen.")
         }
         let opts: CGWindowImageOption = [.boundsIgnoreFraming, .bestResolution]
         guard let image = CGWindowListCreateImage(.null,

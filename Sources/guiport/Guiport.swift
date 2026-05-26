@@ -37,6 +37,9 @@ struct Guiport: AsyncParsableCommand {
             RunCommand.self,
             ServeCommand.self,
             BenchCommand.self,
+            LifecycleCommand.self,
+            LogsCommand.self,
+            FsCommand.self,
         ],
         defaultSubcommand: nil
     )
