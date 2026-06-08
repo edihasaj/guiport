@@ -26,11 +26,17 @@ enum WinScreenshot {
         guard vw > 0, vh > 0 else {
             throw GuiportError(code: "no_display", message: "no virtual desktop dimensions")
         }
-        let screenDC = GetDC(nil)
+        guard let screenDC = GetDC(nil) else {
+            throw GuiportError(code: "getdc_failed", message: "GetDC returned nil")
+        }
         defer { ReleaseDC(nil, screenDC) }
-        let memDC = CreateCompatibleDC(screenDC)
+        guard let memDC = CreateCompatibleDC(screenDC) else {
+            throw GuiportError(code: "compatible_dc_failed", message: "CreateCompatibleDC returned nil")
+        }
         defer { DeleteDC(memDC) }
-        let bmp = CreateCompatibleBitmap(screenDC, vw, vh)
+        guard let bmp = CreateCompatibleBitmap(screenDC, vw, vh) else {
+            throw GuiportError(code: "bitmap_failed", message: "CreateCompatibleBitmap returned nil")
+        }
         defer { DeleteObject(bmp) }
         let prev = SelectObject(memDC, bmp)
         defer { SelectObject(memDC, prev) }
@@ -55,11 +61,17 @@ enum WinScreenshot {
         guard w > 0, h > 0 else {
             throw GuiportError(code: "empty_window", message: "window has zero area")
         }
-        let winDC = GetWindowDC(hwnd)
+        guard let winDC = GetWindowDC(hwnd) else {
+            throw GuiportError(code: "getdc_failed", message: "GetWindowDC returned nil")
+        }
         defer { ReleaseDC(hwnd, winDC) }
-        let memDC = CreateCompatibleDC(winDC)
+        guard let memDC = CreateCompatibleDC(winDC) else {
+            throw GuiportError(code: "compatible_dc_failed", message: "CreateCompatibleDC returned nil")
+        }
         defer { DeleteDC(memDC) }
-        let bmp = CreateCompatibleBitmap(winDC, Int32(w), Int32(h))
+        guard let bmp = CreateCompatibleBitmap(winDC, Int32(w), Int32(h)) else {
+            throw GuiportError(code: "bitmap_failed", message: "CreateCompatibleBitmap returned nil")
+        }
         defer { DeleteObject(bmp) }
         let prev = SelectObject(memDC, bmp)
         defer { SelectObject(memDC, prev) }
