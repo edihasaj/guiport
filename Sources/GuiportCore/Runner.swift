@@ -1,5 +1,4 @@
 import Foundation
-import Yams
 
 public struct StepResult: Encodable {
     public let action: String
@@ -37,8 +36,7 @@ public enum Runner {
     public static func run(path: String, artifactsDir: String) async throws -> RunResult {
         let url = URL(fileURLWithPath: path)
         let raw = try String(contentsOf: url, encoding: .utf8)
-        let parsed = try Yams.load(yaml: raw) as? [String: Any]
-            ?? { throw GuiportError(code: "yaml_parse", message: "test file is not a mapping") }()
+        let parsed = try parseFlow(raw)
 
         try? FileManager.default.createDirectory(atPath: artifactsDir, withIntermediateDirectories: true)
 
@@ -83,6 +81,106 @@ public enum Runner {
             path: path, passed: passed, steps: results, artifactsDir: artifactsDir,
             failureArtifacts: failureArtifacts.isEmpty ? nil : failureArtifacts
         )
+    }
+
+    private static func parseFlow(_ raw: String) throws -> [String: Any] {
+        var result: [String: Any] = [:]
+        let lines = raw.components(separatedBy: .newlines)
+        var index = 0
+
+        while index < lines.count {
+            let line = stripComment(lines[index]).trimmingCharacters(in: .whitespaces)
+            index += 1
+            if line.isEmpty { continue }
+
+            if line == "steps:" {
+                var steps: [Any] = []
+                while index < lines.count {
+                    let rawStep = stripComment(lines[index])
+                    let trimmed = rawStep.trimmingCharacters(in: .whitespaces)
+                    if trimmed.isEmpty {
+                        index += 1
+                        continue
+                    }
+                    if !rawStep.hasPrefix(" ") && !rawStep.hasPrefix("\t") { break }
+                    guard trimmed.hasPrefix("- ") else {
+                        throw GuiportError(code: "yaml_parse", message: "step must start with `- `")
+                    }
+                    let item = String(trimmed.dropFirst(2))
+                    let (key, valueText) = try splitMapping(item)
+                    index += 1
+
+                    if valueText.isEmpty {
+                        var nested: [String: Any] = [:]
+                        while index < lines.count {
+                            let rawNested = stripComment(lines[index])
+                            let nestedTrimmed = rawNested.trimmingCharacters(in: .whitespaces)
+                            if nestedTrimmed.isEmpty {
+                                index += 1
+                                continue
+                            }
+                            if !rawNested.hasPrefix("    ") && !rawNested.hasPrefix("\t\t") { break }
+                            let (nestedKey, nestedValue) = try splitMapping(nestedTrimmed)
+                            nested[nestedKey] = parseScalar(nestedValue)
+                            index += 1
+                        }
+                        steps.append([key: nested])
+                    } else {
+                        steps.append([key: parseScalar(valueText)])
+                    }
+                }
+                result["steps"] = steps
+                continue
+            }
+
+            let (key, value) = try splitMapping(line)
+            result[key] = parseScalar(value)
+        }
+
+        guard result["steps"] is [Any] else {
+            throw GuiportError(code: "yaml_parse", message: "test file needs `steps:`")
+        }
+        return result
+    }
+
+    private static func stripComment(_ line: String) -> String {
+        var inSingle = false
+        var inDouble = false
+        for (idx, ch) in line.enumerated() {
+            if ch == "'" && !inDouble { inSingle.toggle() }
+            if ch == "\"" && !inSingle { inDouble.toggle() }
+            if ch == "#" && !inSingle && !inDouble {
+                let i = line.index(line.startIndex, offsetBy: idx)
+                return String(line[..<i])
+            }
+        }
+        return line
+    }
+
+    private static func splitMapping(_ line: String) throws -> (String, String) {
+        guard let colon = line.firstIndex(of: ":") else {
+            throw GuiportError(code: "yaml_parse", message: "expected `key: value`, got `\(line)`")
+        }
+        let key = line[..<colon].trimmingCharacters(in: .whitespaces)
+        let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+        if key.isEmpty {
+            throw GuiportError(code: "yaml_parse", message: "mapping key is empty")
+        }
+        return (key, value)
+    }
+
+    private static func parseScalar(_ value: String) -> Any {
+        if value == "true" { return true }
+        if value == "false" { return false }
+        if let int = Int(value) { return int }
+        if value.hasPrefix("["), value.hasSuffix("]") {
+            let body = value.dropFirst().dropLast()
+            return body.split(separator: ",").map { parseScalar($0.trimmingCharacters(in: .whitespaces)) }
+        }
+        if (value.hasPrefix("\"") && value.hasSuffix("\"")) || (value.hasPrefix("'") && value.hasSuffix("'")) {
+            return String(value.dropFirst().dropLast())
+        }
+        return value
     }
 
     // MARK: - Step execution

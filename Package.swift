@@ -13,15 +13,11 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.4.0"),
-        .package(url: "https://github.com/jpsim/Yams.git", from: "5.1.0"),
     ],
     targets: [
         // Platform-agnostic core: types, selector engine, runner, MCP server, adapter protocol.
         .target(
-            name: "GuiportCore",
-            dependencies: [
-                .product(name: "Yams", package: "Yams"),
-            ]
+            name: "GuiportCore"
         ),
         // macOS adapter: Apple AX, CGEvent, Screenshots, Vision OCR, CGEventTap recorder.
         .target(
