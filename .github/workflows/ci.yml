@@ -49,8 +49,8 @@ jobs:
       - name: Setup Swift
         uses: compnerd/gha-setup-swift@main
         with:
-          branch: swift-5.10-release
-          tag: 5.10-RELEASE
+          branch: swift-6.2-release
+          tag: 6.2-RELEASE
 
       - name: Show toolchain
         shell: pwsh
