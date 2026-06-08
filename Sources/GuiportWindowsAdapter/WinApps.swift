@@ -123,7 +123,7 @@ private final class WinEnumContext {
     var windows: [WinApps.Win] = []
 }
 
-private func guiportAppsEnumWindowsCallback(_ hwnd: HWND?, _ lparam: LPARAM) -> Bool {
+private func guiportAppsEnumWindowsCallback(_ hwnd: HWND?, _ lparam: LPARAM) -> WindowsBool {
     guard let hwnd else { return true }
     let ctx = Unmanaged<WinEnumContext>
         .fromOpaque(UnsafeRawPointer(bitPattern: UInt(lparam))!)

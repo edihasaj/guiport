@@ -172,7 +172,7 @@ private final class HwndCtx {
     }
 }
 
-private func guiportScreenshotEnumWindowsCallback(_ hwnd: HWND?, _ lparam: LPARAM) -> Bool {
+private func guiportScreenshotEnumWindowsCallback(_ hwnd: HWND?, _ lparam: LPARAM) -> WindowsBool {
     guard let hwnd else { return true }
     let ctx = Unmanaged<HwndCtx>
         .fromOpaque(UnsafeRawPointer(bitPattern: UInt(lparam))!)
