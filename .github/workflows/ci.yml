@@ -58,7 +58,7 @@ jobs:
           swift --version
 
       - name: Setup Visual Studio environment
-        uses: compnerd/gha-setup-vsdevenv
+        uses: compnerd/gha-setup-vsdevenv@main
         with:
           winsdk: "10.0.22621.0"
 
