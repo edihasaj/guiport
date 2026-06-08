@@ -5,14 +5,13 @@ import Foundation
 /// Tools: apps, doctor, observe, tree, find, click, type, hotkey, screenshot, run.
 public enum MCPServer {
     public static func runStdio() async throws {
-        let stdin = FileHandle.standardInput
         let stdout = FileHandle.standardOutput
         let stderr = FileHandle.standardError
 
         stderr.write(Data("guiport MCP server ready\n".utf8))
 
         let buffer = LineBuffer()
-        for try await line in stdin.bytes.lines {
+        while let line = readLine(strippingNewline: true) {
             buffer.feed(line)
             while let frame = buffer.takeFrame() {
                 await handleFrame(frame, out: stdout, err: stderr)
