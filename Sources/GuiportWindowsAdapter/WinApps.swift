@@ -75,23 +75,13 @@ enum WinApps {
     // MARK: - Win32
 
     private static func enumerateWindows() -> [Win] {
-        var out: [Win] = []
-        let ctx = WinEnumContext(out: { out.append($0) })
+        let ctx = WinEnumContext()
         let opaque = Unmanaged.passUnretained(ctx).toOpaque()
-        _ = EnumWindows({ hwnd, lparam in
-            guard let hwnd else { return true }
-            let ctx = Unmanaged<WinEnumContext>.fromOpaque(UnsafeRawPointer(bitPattern: UInt(lparam))!).takeUnretainedValue()
-            var pid: DWORD = 0
-            _ = GetWindowThreadProcessId(hwnd, &pid)
-            let visible = IsWindowVisible(hwnd)
-            let title = readWindowText(hwnd)
-            ctx.out(Win(hwnd: hwnd, pid: pid, title: title, visible: visible))
-            return true
-        }, LPARAM(Int(bitPattern: opaque)))
-        return out
+        _ = EnumWindows(guiportAppsEnumWindowsCallback, LPARAM(Int(bitPattern: opaque)))
+        return ctx.windows
     }
 
-    private static func readWindowText(_ hwnd: HWND) -> String {
+    fileprivate static func readWindowText(_ hwnd: HWND) -> String {
         let len = GetWindowTextLengthW(hwnd)
         if len <= 0 { return "" }
         var buf = [WCHAR](repeating: 0, count: Int(len) + 1)
@@ -130,7 +120,19 @@ enum WinApps {
 /// Box for the `EnumWindows` callback — a Swift closure can't be passed to a C
 /// function pointer that captures state, so we tunnel context through `LPARAM`.
 private final class WinEnumContext {
-    let out: (WinApps.Win) -> Void
-    init(out: @escaping (WinApps.Win) -> Void) { self.out = out }
+    var windows: [WinApps.Win] = []
+}
+
+private func guiportAppsEnumWindowsCallback(_ hwnd: HWND?, _ lparam: LPARAM) -> Bool {
+    guard let hwnd else { return true }
+    let ctx = Unmanaged<WinEnumContext>
+        .fromOpaque(UnsafeRawPointer(bitPattern: UInt(lparam))!)
+        .takeUnretainedValue()
+    var pid: DWORD = 0
+    _ = GetWindowThreadProcessId(hwnd, &pid)
+    let visible = IsWindowVisible(hwnd)
+    let title = WinApps.readWindowText(hwnd)
+    ctx.windows.append(WinApps.Win(hwnd: hwnd, pid: pid, title: title, visible: visible))
+    return true
 }
 #endif

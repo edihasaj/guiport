@@ -90,21 +90,10 @@ enum WinScreenshot {
     // MARK: - HWND lookup
 
     private static func topLevelHwnd(forPid pid: DWORD) -> HWND? {
-        var found: HWND? = nil
-        let ctx = HwndCtx(pid: pid, out: { found = $0 })
+        let ctx = HwndCtx(pid: pid)
         let opaque = Unmanaged.passUnretained(ctx).toOpaque()
-        _ = EnumWindows({ hwnd, lparam in
-            guard let hwnd else { return true }
-            let ctx = Unmanaged<HwndCtx>.fromOpaque(UnsafeRawPointer(bitPattern: UInt(lparam))!).takeUnretainedValue()
-            var p: DWORD = 0
-            _ = GetWindowThreadProcessId(hwnd, &p)
-            if p == ctx.pid, IsWindowVisible(hwnd) {
-                ctx.out(hwnd)
-                return false   // stop enumeration on first hit
-            }
-            return true
-        }, LPARAM(Int(bitPattern: opaque)))
-        return found
+        _ = EnumWindows(guiportScreenshotEnumWindowsCallback, LPARAM(Int(bitPattern: opaque)))
+        return ctx.found
     }
 
     // MARK: - PNG encode
@@ -177,10 +166,23 @@ enum WinScreenshot {
 
 private final class HwndCtx {
     let pid: DWORD
-    let out: (HWND) -> Void
-    init(pid: DWORD, out: @escaping (HWND) -> Void) {
+    var found: HWND?
+    init(pid: DWORD) {
         self.pid = pid
-        self.out = out
     }
+}
+
+private func guiportScreenshotEnumWindowsCallback(_ hwnd: HWND?, _ lparam: LPARAM) -> Bool {
+    guard let hwnd else { return true }
+    let ctx = Unmanaged<HwndCtx>
+        .fromOpaque(UnsafeRawPointer(bitPattern: UInt(lparam))!)
+        .takeUnretainedValue()
+    var pid: DWORD = 0
+    _ = GetWindowThreadProcessId(hwnd, &pid)
+    if pid == ctx.pid, IsWindowVisible(hwnd) {
+        ctx.found = hwnd
+        return false
+    }
+    return true
 }
 #endif
