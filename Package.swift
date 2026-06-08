@@ -67,5 +67,12 @@ let package = Package(
             name: "GuiportCoreTests",
             dependencies: ["GuiportCore"]
         ),
+        // CLI integration tests — spawn the built `guiport` binary and
+        // assert on stdout/stderr/exit code. Lives separate from
+        // GuiportCoreTests because it shells out and is slower.
+        .testTarget(
+            name: "GuiportCLITests",
+            dependencies: ["guiport"]
+        ),
     ]
 )
