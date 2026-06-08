@@ -57,6 +57,11 @@ jobs:
         run: |
           swift --version
 
+      - name: Setup Visual Studio environment
+        uses: compnerd/gha-setup-vsdevenv
+        with:
+          winsdk: "10.0.22621.0"
+
       - name: Build
         shell: pwsh
         run: swift build -c release
