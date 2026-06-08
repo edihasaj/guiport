@@ -19,7 +19,7 @@ public struct MacAdapter: DesktopAdapter {
 
     public func enrolScreenRecording() {
         // Side-effecting: actually attempt a tiny capture so macOS adds guiport
-        // (CFBundleIdentifier dev.guiport.cli) to System Settings → Screen Recording.
+        // (CFBundleIdentifier com.edihasaj.guiport) to System Settings → Screen Recording.
         // Result is intentionally discarded.
         _ = CGDisplayCreateImage(CGMainDisplayID())
     }

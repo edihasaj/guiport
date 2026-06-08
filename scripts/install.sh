@@ -49,6 +49,15 @@ swift build -c release
 BIN_SRC=".build/release/guiport"
 [ -f "$BIN_SRC" ] || die "Build did not produce $BIN_SRC"
 
+if [ "$UNAME_S" = "Darwin" ]; then
+  say "Installing signed guiport.app wrapper…"
+  if scripts/install-macos-app.sh --bin "$BIN_SRC"; then
+    say "Installed app wrapper with icon for stable macOS TCC grants."
+  else
+    warn "Could not install guiport.app wrapper. The CLI still works, but Screen Recording may need a separate grant."
+  fi
+fi
+
 say "Installing to $BIN_DIR/guiport (sudo may prompt)…"
 if [ -w "$BIN_DIR" ]; then
   cp "$BIN_SRC" "$BIN_DIR/guiport"
@@ -63,9 +72,8 @@ say "Installed: $(command -v guiport)"
 case "$UNAME_S" in
   Darwin)
     say "Next:"
-    say "  1. Grant Accessibility + Screen Recording in System Settings → Privacy & Security."
-    say "  2. Add the terminal app you'll run guiport from (Terminal/iTerm/Ghostty/etc.)."
-    say "  3. Run: guiport doctor"
+    say "  1. Grant Accessibility + Screen Recording to guiport in System Settings → Privacy & Security."
+    say "  2. Run: guiport doctor"
     ;;
   Linux)
     say "Next:"

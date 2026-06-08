@@ -9,6 +9,13 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 - `scripts/install.ps1` — real PowerShell installer (clones, `swift build -c release`, drops binary in `%LOCALAPPDATA%\Programs\guiport`, adds to user PATH).
 - **Linux beta.** New `GuiportLinuxAdapter` target. Session-aware day-1 surface: `xdotool` + `wmctrl` + `scrot`/`import` on X11, `ydotool` + `grim` on Wayland. `apps` uses `wmctrl -lpG` on X11 and a `/proc` walk on Wayland. All shell-outs go through `Process` with discrete argv (never a shell), so user-supplied titles / type-text are safe even with metacharacters. CI now builds on `ubuntu-24.04` alongside macOS + Windows.
 - `scripts/install.sh` now installs on Linux too (was a roadmap stub before).
+- `scripts/install-macos-app.sh` installs a signed `guiport.app` wrapper with
+  the project icon so macOS permission panes show the guiport logo.
+
+### Fixed
+- macOS TCC identity now uses `com.edihasaj.guiport` consistently in the CLI
+  binary and app wrapper, so Screen Recording grants apply to `guiport doctor`
+  and screenshot commands.
 
 ### Pending on Windows
 - UIA-backed `tree` / `observe` / `find` / `click <selector>` and WinRT `find-text` / `record` — these throw `uia_pending` / `ocr_pending` / `recorder_pending` with a roadmap hint until COM/WinRT bindings land.
@@ -27,7 +34,7 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 ## [0.1.2] — 2026-05-10
 
 ### Fixed
-- **TCC now tracks guiport as its own subject.** Embedded an `Info.plist` (with `CFBundleIdentifier dev.guiport.cli`, `NSAccessibilityUsageDescription`, `NSScreenCaptureUsageDescription`, `NSAppleEventsUsageDescription`) into the binary's `__TEXT,__info_plist` section via SwiftPM linker flags. Result: granting Screen Recording / Accessibility once for guiport is enough — works from Ghostty, Terminal.app, iTerm, opencode, or any other terminal. Previously TCC fell through to the parent terminal because no usage strings were present.
+- **TCC now tracks guiport as its own subject.** Embedded an `Info.plist` (with `CFBundleIdentifier com.edihasaj.guiport`, `NSAccessibilityUsageDescription`, `NSScreenCaptureUsageDescription`, `NSAppleEventsUsageDescription`) into the binary's `__TEXT,__info_plist` section via SwiftPM linker flags. Result: granting Screen Recording / Accessibility once for guiport is enough — works from Ghostty, Terminal.app, iTerm, opencode, or any other terminal. Previously TCC fell through to the parent terminal because no usage strings were present.
 
 ## [0.1.1] — 2026-05-10
 

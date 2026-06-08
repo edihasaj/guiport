@@ -27,7 +27,9 @@ brew install guiport
 curl -fsSL https://raw.githubusercontent.com/edihasaj/guiport/main/scripts/install.sh | sh
 ```
 
-The script installs Xcode CLT if missing, builds release, and copies the binary to `/usr/local/bin/guiport`.
+The script installs Xcode CLT if missing, builds release, copies the binary to
+`/usr/local/bin/guiport`, and installs a signed `guiport.app` wrapper with the
+project icon for stable macOS permission grants.
 
 ### Build from source
 
@@ -36,14 +38,15 @@ git clone https://github.com/edihasaj/guiport.git
 cd guiport
 swift build -c release
 sudo cp .build/release/guiport /usr/local/bin/guiport
+scripts/install-macos-app.sh --bin /usr/local/bin/guiport
 ```
 
 ### Permissions
 
 guiport needs two macOS permissions:
 
-1. **System Settings → Privacy & Security → Accessibility** — add your terminal.
-2. **System Settings → Privacy & Security → Screen Recording** — add your terminal.
+1. **System Settings → Privacy & Security → Accessibility** — add `guiport`.
+2. **System Settings → Privacy & Security → Screen Recording** — add `guiport`.
 
 Verify:
 
