@@ -132,21 +132,21 @@ enum WinScreenshot {
         var data = Data(capacity: fileSize)
         // BITMAPFILEHEADER
         data.append(contentsOf: [0x42, 0x4D])                          // 'BM'
-        data.append(le32(UInt32(fileSize)))
-        data.append(le32(0))
-        data.append(le32(54))                                          // pixel offset
+        data.append(contentsOf: le32(UInt32(fileSize)))
+        data.append(contentsOf: le32(0))
+        data.append(contentsOf: le32(54))                              // pixel offset
         // BITMAPINFOHEADER
-        data.append(le32(40))                                          // size
-        data.append(le32(UInt32(width)))
-        data.append(le32(UInt32(bitPattern: Int32(-Int32(height)))))   // negative = top-down
-        data.append(le16(1))                                           // planes
-        data.append(le16(32))                                          // bpp
-        data.append(le32(0))                                           // BI_RGB
-        data.append(le32(UInt32(pixelSize)))
-        data.append(le32(2835))                                        // 72 DPI
-        data.append(le32(2835))
-        data.append(le32(0))
-        data.append(le32(0))
+        data.append(contentsOf: le32(40))                              // size
+        data.append(contentsOf: le32(UInt32(width)))
+        data.append(contentsOf: le32(UInt32(bitPattern: Int32(-Int32(height))))) // negative = top-down
+        data.append(contentsOf: le16(1))                               // planes
+        data.append(contentsOf: le16(32))                              // bpp
+        data.append(contentsOf: le32(0))                               // BI_RGB
+        data.append(contentsOf: le32(UInt32(pixelSize)))
+        data.append(contentsOf: le32(2835))                            // 72 DPI
+        data.append(contentsOf: le32(2835))
+        data.append(contentsOf: le32(0))
+        data.append(contentsOf: le32(0))
         data.append(contentsOf: pixels)
         // mkdir -p
         let url = URL(fileURLWithPath: path)
