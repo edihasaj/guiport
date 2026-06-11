@@ -33,14 +33,21 @@ Agents shouldn't drive desktop apps by guessing pixels. `guiport` exposes the de
 macOS 13+. See [INSTALL.md](INSTALL.md) for full options + platform status.
 
 ```sh
-# Homebrew (once tap is published)
-brew tap edihasaj/guiport && brew install guiport
+# Homebrew (recommended) — universal binary, auto-updates with `brew upgrade`
+brew install edihasaj/guiport/guiport
 
 # Or install script
 curl -fsSL https://raw.githubusercontent.com/edihasaj/guiport/main/scripts/install.sh | sh
 
 # Or from source
 swift build -c release && sudo cp .build/release/guiport /usr/local/bin/guiport
+```
+
+After install, grant the two macOS permissions and verify:
+
+```sh
+guiport doctor --fix   # opens the right Privacy panes
+guiport doctor         # all green when ready
 ```
 
 Windows (beta — input/screenshot/apps; UIA tree pending):

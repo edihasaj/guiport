@@ -15,11 +15,20 @@ The macOS path remains the primary target per [`goal.md`](goal.md). Windows ship
 ### Homebrew (recommended)
 
 ```sh
+brew install edihasaj/guiport/guiport
+```
+
+Or tap first, then install:
+
+```sh
 brew tap edihasaj/guiport
 brew install guiport
 ```
 
-> The tap repository is `edihasaj/homebrew-guiport`. Until that's published, use the install script or build from source.
+Ships a universal (arm64 + x86_64) binary from the
+[`edihasaj/homebrew-guiport`](https://github.com/edihasaj/homebrew-guiport)
+tap; each tagged release auto-bumps the formula, so `brew upgrade guiport`
+tracks the latest.
 
 ### Install script
 
