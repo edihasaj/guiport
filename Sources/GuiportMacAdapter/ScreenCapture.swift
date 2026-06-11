@@ -23,10 +23,11 @@ enum ScreenCapture {
     /// best-effort side effect used by `doctor --fix`.
     static func enrol() {
         if #available(macOS 14.0, *) {
-            _ = try? runBlocking { () -> Bool in
-                _ = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-                return true
-            }
+            // Must attempt a real frame capture, not just list shareable content:
+            // SCShareableContent listing does NOT require Screen Recording and so
+            // never triggers the TCC prompt or enrols the binary. SCScreenshotManager
+            // capture does. Errors are swallowed — this is best-effort.
+            _ = try? captureDisplay(CGMainDisplayID(), scale: 1.0)
         } else {
             _ = CGDisplayCreateImage(CGMainDisplayID())
         }

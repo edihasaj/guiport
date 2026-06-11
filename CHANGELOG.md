@@ -24,7 +24,16 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
   responsible foreground app (e.g. the terminal running the CLI), so `guiport`
   never got its own entry; ScreenCaptureKit enrols `com.edihasaj.guiport` as its
   own subject and prompts for it by name. Falls back to the legacy path on
-  macOS 13.
+  macOS 13. `doctor --fix` now attempts a real ScreenCaptureKit frame capture to
+  trigger enrolment — listing shareable content alone does not require the
+  permission and so never prompted.
+- **Release binaries are now Developer-ID signed.** `release.yml` signs the
+  universal binary with the Applifyer Developer ID (hardened runtime, stable
+  `com.edihasaj.guiport` identifier) when `MACOS_CERT_P12_BASE64` /
+  `MACOS_CERT_PASSWORD` secrets are set. A `swift build` binary is only ad-hoc
+  signed, so its TCC identity (and any Screen Recording grant) reset on every
+  `brew upgrade`; a stable Developer-ID identity persists across upgrades. See
+  `docs/RELEASING.md`.
 
 ### Pending on Windows
 - UIA-backed `tree` / `observe` / `find` / `click <selector>` and WinRT `find-text` / `record` — these throw `uia_pending` / `ocr_pending` / `recorder_pending` with a roadmap hint until COM/WinRT bindings land.

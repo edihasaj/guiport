@@ -89,6 +89,63 @@ jobs:
       - name: Build universal release binary
         run: swift build -c release --arch arm64 --arch x86_64
 
+      # Developer-ID sign so macOS treats guiport as its OWN, stable TCC subject.
+      # A `swift build` binary is only ad-hoc signed (identifier "guiport", cdhash
+      # changes every build), so macOS attributes its Screen Recording request to
+      # the host terminal and the grant is lost on every `brew upgrade`. A stable
+      # Developer-ID identity (com.edihasaj.guiport + team) gives guiport a single
+      # persistent entry. Gated on secrets: skips gracefully (ad-hoc) if unset.
+      - name: Import Developer ID certificate
+        id: cert
+        env:
+          CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CERT_P12_BASE64:-}" ]; then
+            echo "::warning::MACOS_CERT_P12_BASE64 not set — shipping an ad-hoc-signed"
+            echo "::warning::binary. guiport will NOT get a stable Screen Recording"
+            echo "::warning::(TCC) identity; grants reset on every upgrade. Add the"
+            echo "::warning::secret (base64 of a Developer ID Application .p12) plus"
+            echo "::warning::MACOS_CERT_PASSWORD to enable signing."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          keychain="$RUNNER_TEMP/guiport-signing.keychain-db"
+          kpw="$(uuidgen)"
+          security create-keychain -p "$kpw" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$kpw" "$keychain"
+          echo "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$CERT_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$kpw" \
+            "$keychain" >/dev/null
+          # Prepend our keychain to the search list so codesign resolves the identity.
+          security list-keychains -d user -s "$keychain" \
+            $(security list-keychains -d user | sed -e 's/[[:space:]]*"//' -e 's/"//')
+          id=$(security find-identity -v -p codesigning "$keychain" \
+            | grep -oE '"Developer ID Application: [^"]+"' | head -1 | tr -d '"')
+          [ -n "$id" ] || { echo "no Developer ID Application identity in p12" >&2; exit 1; }
+          echo "::add-mask::$id"
+          echo "identity=$id" >> "$GITHUB_OUTPUT"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+      - name: Codesign binary (Developer ID, hardened runtime)
+        if: steps.cert.outputs.signed == 'true'
+        env:
+          IDENTITY: ${{ steps.cert.outputs.identity }}
+        run: |
+          set -euo pipefail
+          bindir=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)
+          codesign --force --options runtime --timestamp \
+            --sign "$IDENTITY" \
+            --identifier com.edihasaj.guiport \
+            "$bindir/guiport"
+          codesign --verify --strict --verbose=2 "$bindir/guiport"
+          codesign -dv --verbose=4 "$bindir/guiport" 2>&1 | grep -E 'Identifier|TeamIdentifier'
+
       - name: Package tarball
         id: pkg
         env:
