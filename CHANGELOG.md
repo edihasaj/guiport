@@ -16,6 +16,15 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 - macOS TCC identity now uses `com.edihasaj.guiport` consistently in the CLI
   binary and app wrapper, so Screen Recording grants apply to `guiport doctor`
   and screenshot commands.
+- **Screen Recording is now attributed to `guiport`, not the host terminal.**
+  Screenshot, screenshot-on-failure, OCR (`find-text`), and `doctor --fix`
+  enrolment moved off the deprecated CoreGraphics capture APIs
+  (`CGDisplayCreateImage` / `CGWindowListCreateImage`) onto ScreenCaptureKit on
+  macOS 14+. Those legacy calls made macOS grant Screen Recording to the
+  responsible foreground app (e.g. the terminal running the CLI), so `guiport`
+  never got its own entry; ScreenCaptureKit enrols `com.edihasaj.guiport` as its
+  own subject and prompts for it by name. Falls back to the legacy path on
+  macOS 13.
 
 ### Pending on Windows
 - UIA-backed `tree` / `observe` / `find` / `click <selector>` and WinRT `find-text` / `record` — these throw `uia_pending` / `ocr_pending` / `recorder_pending` with a roadmap hint until COM/WinRT bindings land.

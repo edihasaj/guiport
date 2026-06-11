@@ -57,6 +57,14 @@ guiport needs two macOS permissions:
 1. **System Settings → Privacy & Security → Accessibility** — add `guiport`.
 2. **System Settings → Privacy & Security → Screen Recording** — add `guiport`.
 
+Run `guiport doctor --fix` to trigger both prompts and have macOS enrol `guiport`
+as its own subject (it uses ScreenCaptureKit, so the grant is attributed to
+`guiport` itself — not the terminal hosting it), then toggle it ON.
+
+> Upgrading from an older build whose Screen Recording grant was attributed to your
+> terminal? Reset just guiport's stale entry without touching other apps:
+> `tccutil reset ScreenCapture com.edihasaj.guiport`, then `guiport doctor --fix`.
+
 Verify:
 
 ```sh

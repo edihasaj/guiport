@@ -56,12 +56,8 @@ enum OCR {
         if pickedNumber == 0 {
             throw GuiportError(code: "no_window", message: "no window found for \(target.name)")
         }
-        let imageOpts: CGWindowImageOption = [.boundsIgnoreFraming, .bestResolution]
-        guard let image = CGWindowListCreateImage(.null, .optionIncludingWindow, pickedNumber, imageOpts) else {
-            throw GuiportError(code: "ocr_capture",
-                               message: "CGWindowListCreateImage failed",
-                               hint: "Grant Screen Recording permission and retry.")
-        }
+        let scale = NSScreen.main?.backingScaleFactor ?? 2.0
+        let image = try ScreenCapture.captureWindow(pickedNumber, scale: scale)
         return (image, pickedFrame)
     }
 
@@ -70,11 +66,7 @@ enum OCR {
             throw GuiportError(code: "no_screen", message: "no main screen")
         }
         let displayId = main.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID ?? CGMainDisplayID()
-        guard let image = CGDisplayCreateImage(displayId) else {
-            throw GuiportError(code: "ocr_capture",
-                               message: "CGDisplayCreateImage failed",
-                               hint: "Grant Screen Recording permission and retry.")
-        }
+        let image = try ScreenCapture.captureDisplay(displayId, scale: main.backingScaleFactor)
         // NSScreen.frame uses bottom-left origin; convert to top-left for screen coords.
         let f = main.frame
         let screenHeight = NSScreen.screens.first?.frame.height ?? f.height

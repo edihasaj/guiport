@@ -34,11 +34,7 @@ enum Screenshot {
             throw GuiportError(code: "no_screen", message: "no main screen")
         }
         let displayId = main.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID ?? CGMainDisplayID()
-        guard let image = CGDisplayCreateImage(displayId) else {
-            throw GuiportError(code: "capture_failed",
-                               message: "CGDisplayCreateImage returned nil",
-                               hint: "Grant Screen Recording permission and retry.")
-        }
+        let image = try ScreenCapture.captureDisplay(displayId, scale: main.backingScaleFactor)
         try writePNG(image, to: path)
         return ScreenshotResult(path: path, width: image.width, height: image.height, scope: "screen")
     }
@@ -49,15 +45,8 @@ enum Screenshot {
                                message: "could not find a window for \(target.name)",
                                hint: "menu-bar-only apps (EUnifyer, OneDrive, etc.) have no window — try `guiport tree --app \(target.name) --tray` to inspect their status item, or omit --app to screenshot the whole screen.")
         }
-        let opts: CGWindowImageOption = [.boundsIgnoreFraming, .bestResolution]
-        guard let image = CGWindowListCreateImage(.null,
-                                                  .optionIncludingWindow,
-                                                  CGWindowID(info.windowNumber),
-                                                  opts) else {
-            throw GuiportError(code: "capture_failed",
-                               message: "CGWindowListCreateImage returned nil",
-                               hint: "Grant Screen Recording permission and retry.")
-        }
+        let scale = NSScreen.main?.backingScaleFactor ?? 2.0
+        let image = try ScreenCapture.captureWindow(CGWindowID(info.windowNumber), scale: scale)
         try writePNG(image, to: path)
         return ScreenshotResult(path: path, width: image.width, height: image.height, scope: "window")
     }

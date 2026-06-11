@@ -18,10 +18,12 @@ public struct MacAdapter: DesktopAdapter {
     public func requestScreenRecordingPermission() -> Bool { Screenshot.requestScreenRecordingPermission() }
 
     public func enrolScreenRecording() {
-        // Side-effecting: actually attempt a tiny capture so macOS adds guiport
-        // (CFBundleIdentifier com.edihasaj.guiport) to System Settings → Screen Recording.
-        // Result is intentionally discarded.
-        _ = CGDisplayCreateImage(CGMainDisplayID())
+        // Side-effecting: fetch ScreenCaptureKit shareable content so macOS enrols
+        // guiport (com.edihasaj.guiport) as its OWN Screen Recording subject and adds
+        // it to System Settings → Screen Recording. The legacy CGDisplayCreateImage
+        // path attributed the grant to the host terminal instead (and is a no-op on
+        // macOS 14+). Result is intentionally discarded.
+        ScreenCapture.enrol()
     }
 
     public func openSystemSettings(for permission: PermissionKind) {
