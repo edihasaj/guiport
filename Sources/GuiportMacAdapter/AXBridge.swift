@@ -135,6 +135,9 @@ enum AXBridge {
     static func locate(in target: AppTarget, id: String) throws -> AXUIElement? {
         try requireTrusted()
         let appElement = AXUIElementCreateApplication(target.pid)
+        // Match tree(): coax Chromium/Electron into exposing its AX tree so the
+        // path ids we relocate (for AXPress) resolve against the same nodes.
+        enableElectronAX(appElement)
         var roots: [AXUIElement] = []
         if let w = focusedOrTitledWindow(in: appElement, titleHint: target.windowTitleHint) {
             roots.append(w)
