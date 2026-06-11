@@ -19,6 +19,8 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+    outputs:
+      next: ${{ steps.bump.outputs.next }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -54,3 +56,94 @@ jobs:
           git tag "v${NEXT}"
           git push origin HEAD:main
           git push origin "v${NEXT}"
+
+  # Build the universal macOS binary for the freshly-tagged version, attach it
+  # to the GitHub release, and bump the Homebrew tap so `brew upgrade guiport`
+  # tracks it. Runs in the SAME workflow run as `bump` (needs:) because a tag
+  # pushed by GITHUB_TOKEN does not trigger a fresh `on: push: tags` run.
+  release:
+    needs: bump
+    runs-on: macos-14
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "v${{ needs.bump.outputs.next }}"
+          fetch-depth: 0
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          swift --version
+
+      - name: Cache SPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            .build
+          key: spm-release-${{ runner.os }}-${{ hashFiles('Package.resolved', 'Package.swift') }}
+          restore-keys: spm-release-${{ runner.os }}-
+
+      - name: Build universal release binary
+        run: swift build -c release --arch arm64 --arch x86_64
+
+      - name: Package tarball
+        id: pkg
+        env:
+          NEXT: ${{ needs.bump.outputs.next }}
+        run: |
+          set -euo pipefail
+          # Universal builds land under .build/apple/Products/Release, NOT the
+          # single-arch .build/release symlink — resolve it from SwiftPM.
+          bindir=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)
+          name="guiport-${NEXT}-macos-universal.tar.gz"
+          tar -C "$bindir" -czf "$name" guiport
+          sha=$(shasum -a 256 "$name" | awk '{print $1}')
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          # Sanity: the built binary must report the version we just tagged.
+          got=$("$bindir/guiport" --version | tr -d '[:space:]')
+          [ "$got" = "$NEXT" ] || { echo "version mismatch: binary=$got tag=$NEXT"; exit 1; }
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEXT: ${{ needs.bump.outputs.next }}
+        run: |
+          set -euo pipefail
+          gh release create "v${NEXT}" "${{ steps.pkg.outputs.name }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "v${NEXT}" \
+            --generate-notes
+
+      - name: Bump Homebrew tap
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          NEXT: ${{ needs.bump.outputs.next }}
+          SHA: ${{ steps.pkg.outputs.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TAP_TOKEN:-}" ]; then
+            echo "::warning::HOMEBREW_TAP_TOKEN not set — skipping tap bump. The"
+            echo "::warning::release artifact is published; add the secret (a PAT"
+            echo "::warning::with contents:write on edihasaj/homebrew-guiport) to"
+            echo "::warning::auto-bump the formula on future releases."
+            exit 0
+          fi
+          url="https://github.com/${GITHUB_REPOSITORY}/releases/download/v${NEXT}/guiport-${NEXT}-macos-universal.tar.gz"
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/edihasaj/homebrew-guiport.git" tap
+          f=tap/Formula/guiport.rb
+          /usr/bin/sed -i '' -E \
+            -e "s#^  url \".*\"#  url \"${url}\"#" \
+            -e "s#^  sha256 \".*\"#  sha256 \"${SHA}\"#" \
+            -e "s#^  version \".*\"#  version \"${NEXT}\"#" \
+            -e "s#assert_match \"[^\"]*\", shell_output#assert_match \"${NEXT}\", shell_output#" \
+            "$f"
+          cd tap
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add Formula/guiport.rb
+          git commit -m "guiport ${NEXT}"
+          git push origin HEAD:main
