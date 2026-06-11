@@ -9,9 +9,14 @@ enum Input {
 
     static func click(_ node: AXNode, app: AppTarget, button: String, count: Int, useAXPress: Bool) throws -> InputResult {
         try Doctor.ensureAccessibilityOrThrow()
-        // Activate target app first so events route correctly.
-        if let running = NSRunningApplication(processIdentifier: app.pid) {
+        // Only raise the target app if it isn't already frontmost — activating
+        // on every click adds tens of ms and steals focus needlessly in a test
+        // loop. When we DO activate, give the window a brief beat to come
+        // forward so the click lands on it, not whatever it covered.
+        if NSWorkspace.shared.frontmostApplication?.processIdentifier != app.pid,
+           let running = NSRunningApplication(processIdentifier: app.pid) {
             running.activate(options: [])
+            usleep(40_000)
         }
 
         if useAXPress {
@@ -29,10 +34,7 @@ enum Input {
             throw GuiportError(code: "no_bounds", message: "element has no bounds; use --press for AXPress")
         }
         let center = CGPoint(x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2)
-        let mb = parseButton(button)
-        for _ in 0..<max(1, count) {
-            try postClick(at: center, button: mb)
-        }
+        try postClick(at: center, button: parseButton(button), clickCount: max(1, count))
         return InputResult(action: "click", ok: true, detail: "synthetic at \(Int(center.x)),\(Int(center.y))", target: node.id)
     }
 
@@ -42,11 +44,7 @@ enum Input {
 
     static func clickAt(x: Double, y: Double, button: String = "left", count: Int = 1) throws -> InputResult {
         try Doctor.ensureAccessibilityOrThrow()
-        let point = CGPoint(x: x, y: y)
-        let mb = parseButton(button)
-        for _ in 0..<max(1, count) {
-            try postClick(at: point, button: mb)
-        }
+        try postClick(at: CGPoint(x: x, y: y), button: parseButton(button), clickCount: max(1, count))
         return InputResult(action: "click-at", ok: true, detail: "synthetic at \(Int(x)),\(Int(y))", target: nil)
     }
 
@@ -119,7 +117,11 @@ enum Input {
         }
     }
 
-    private static func postClick(at point: CGPoint, button: MouseButton) throws {
+    /// Synthesize a click of `clickCount` presses at `point`. Each down/up pair
+    /// carries an incrementing `mouseEventClickState` (1, 2, …) — this is what
+    /// makes count=2 register as a real double-click rather than two unrelated
+    /// single clicks (AppKit/Chromium both key double-click on this field).
+    private static func postClick(at point: CGPoint, button: MouseButton, clickCount: Int) throws {
         let down: CGEventType
         let up: CGEventType
         let mb: CGMouseButton
@@ -131,12 +133,17 @@ enum Input {
         guard let source = CGEventSource(stateID: .hidSystemState) else {
             throw GuiportError(code: "event_source", message: "could not create CGEventSource")
         }
-        let move = CGEvent(mouseEventSource: source, mouseType: .mouseMoved, mouseCursorPosition: point, mouseButton: mb)
-        let d = CGEvent(mouseEventSource: source, mouseType: down, mouseCursorPosition: point, mouseButton: mb)
-        let u = CGEvent(mouseEventSource: source, mouseType: up, mouseCursorPosition: point, mouseButton: mb)
-        move?.post(tap: .cghidEventTap)
-        d?.post(tap: .cghidEventTap)
-        u?.post(tap: .cghidEventTap)
+        // Move the cursor first so hover state and hit-testing resolve at point.
+        CGEvent(mouseEventSource: source, mouseType: .mouseMoved, mouseCursorPosition: point, mouseButton: mb)?
+            .post(tap: .cghidEventTap)
+        for i in 1...max(1, clickCount) {
+            let d = CGEvent(mouseEventSource: source, mouseType: down, mouseCursorPosition: point, mouseButton: mb)
+            let u = CGEvent(mouseEventSource: source, mouseType: up, mouseCursorPosition: point, mouseButton: mb)
+            d?.setIntegerValueField(.mouseEventClickState, value: Int64(i))
+            u?.setIntegerValueField(.mouseEventClickState, value: Int64(i))
+            d?.post(tap: .cghidEventTap)
+            u?.post(tap: .cghidEventTap)
+        }
     }
 
     private static func postUnicode(_ s: String, source: CGEventSource) throws {

@@ -205,23 +205,77 @@ enum AXBridge {
         }
     }
 
+    // Attributes (plus children) fetched in ONE batched IPC round-trip per
+    // node via AXUIElementCopyMultipleAttributeValues — vs ~13 separate calls.
+    // Order must stay in sync with the indexing in `walk`.
+    private static let batchAttrs: CFArray = [
+        kAXRoleAttribute, kAXSubroleAttribute, kAXTitleAttribute, kAXValueAttribute,
+        kAXIdentifierAttribute, kAXDescriptionAttribute, kAXHelpAttribute,
+        kAXPositionAttribute, kAXSizeAttribute, kAXEnabledAttribute,
+        kAXFocusedAttribute, kAXSelectedAttribute, kAXChildrenAttribute,
+    ] as CFArray
+
+    /// One IPC round-trip for every node attribute we serialize. Missing
+    /// attributes arrive as kAXValueAXErrorType placeholders (or kCFNull);
+    /// both map to nil. This is the single biggest latency lever for deep
+    /// Chromium/Electron trees, where per-attribute IPC dominated.
+    private static func batchFetch(_ element: AXUIElement) -> [CFTypeRef?] {
+        let count = CFArrayGetCount(batchAttrs)
+        var out = [CFTypeRef?](repeating: nil, count: count)
+        var valuesRef: CFArray?
+        let err = AXUIElementCopyMultipleAttributeValues(
+            element, batchAttrs, AXCopyMultipleAttributeOptions(rawValue: 0), &valuesRef)
+        guard err == .success, let values = valuesRef as? [AnyObject], values.count == count else {
+            return out
+        }
+        for (i, v) in values.enumerated() {
+            if v is NSNull { continue }
+            if CFGetTypeID(v) == AXValueGetTypeID(), AXValueGetType(v as! AXValue) == .axError { continue }
+            out[i] = v as CFTypeRef
+        }
+        return out
+    }
+
+    private static func cfStr(_ v: CFTypeRef?) -> String? {
+        guard let v else { return nil }
+        if let s = v as? String { return s }
+        if let n = v as? NSNumber { return n.stringValue }
+        return nil
+    }
+
+    private static func cfBool(_ v: CFTypeRef?) -> Bool? {
+        guard let v, let n = v as? NSNumber else { return nil }
+        return n.boolValue
+    }
+
+    private static func cfBounds(pos: CFTypeRef?, size: CFTypeRef?) -> Bounds? {
+        guard let p = pos, let s = size,
+              CFGetTypeID(p) == AXValueGetTypeID(), CFGetTypeID(s) == AXValueGetTypeID() else { return nil }
+        var cp = CGPoint.zero
+        var cs = CGSize.zero
+        AXValueGetValue(p as! AXValue, .cgPoint, &cp)
+        AXValueGetValue(s as! AXValue, .cgSize, &cs)
+        return Bounds(x: Double(cp.x), y: Double(cp.y), width: Double(cs.width), height: Double(cs.height))
+    }
+
     private static func walk(_ element: AXUIElement,
                              depth: Int,
                              maxDepth: Int,
                              path: String,
                              counter: inout PathCounter,
                              includeHidden: Bool) -> AXNode {
-        let role = stringAttr(element, kAXRoleAttribute as CFString) ?? "Unknown"
-        let subrole = stringAttr(element, kAXSubroleAttribute as CFString)
-        let name = stringAttr(element, kAXTitleAttribute as CFString)
-        let value = stringAttr(element, kAXValueAttribute as CFString)
-        let identifier = stringAttr(element, kAXIdentifierAttribute as CFString)
-        let desc = stringAttr(element, kAXDescriptionAttribute as CFString)
-        let help = stringAttr(element, kAXHelpAttribute as CFString)
-        let b = bounds(of: element)
-        let enabled = boolAttr(element, kAXEnabledAttribute as CFString)
-        let focused = boolAttr(element, kAXFocusedAttribute as CFString)
-        let selected = boolAttr(element, kAXSelectedAttribute as CFString)
+        let a = batchFetch(element)
+        let role = cfStr(a[0]) ?? "Unknown"
+        let subrole = cfStr(a[1])
+        let name = cfStr(a[2])
+        let value = cfStr(a[3])
+        let identifier = cfStr(a[4])
+        let desc = cfStr(a[5])
+        let help = cfStr(a[6])
+        let b = cfBounds(pos: a[7], size: a[8])
+        let enabled = cfBool(a[9])
+        let focused = cfBool(a[10])
+        let selected = cfBool(a[11])
         let acts = actions(of: element)
 
         let n = counter.next(parent: path, role: role)
@@ -230,9 +284,7 @@ enum AXBridge {
 
         var children: [AXNode] = []
         if depth < maxDepth {
-            var childRef: CFTypeRef?
-            if AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childRef) == .success,
-               let arr = childRef as? [AXUIElement] {
+            if let arr = a[12] as? [AXUIElement] {
                 var childCounter = PathCounter()
                 for c in arr {
                     let child = walk(c, depth: depth + 1, maxDepth: maxDepth, path: nodePath, counter: &childCounter, includeHidden: includeHidden)
