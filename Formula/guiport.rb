@@ -28,7 +28,8 @@ class Guiport < Formula
         1. Accessibility   — System Settings → Privacy & Security → Accessibility
         2. Screen Recording — System Settings → Privacy & Security → Screen Recording
 
-      Add the *terminal application* you'll run guiport from (Terminal, iTerm, Ghostty, etc.).
+      Run `guiport doctor --fix` first. It registers ~/Applications/guiport.app
+      so macOS shows a real `guiport` app entry in the permission lists.
 
       After granting, verify with:
 

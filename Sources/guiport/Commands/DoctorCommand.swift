@@ -21,7 +21,8 @@ struct DoctorCommand: AsyncParsableCommand {
             if fix && !report.ok {
                 print("")
                 print("→ macOS prompts only show the dialog the first time guiport asks.")
-                print("→ For repeat runs, toggle the switch in System Settings → Privacy & Security.")
+                print("→ For repeat runs, toggle `guiport` in System Settings → Privacy & Security.")
+                print("→ `doctor --fix` also registers ~/Applications/guiport.app so the list shows a real app entry.")
                 print("→ After granting, re-run any guiport command.")
             }
         }

@@ -5,6 +5,9 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Added
+- `guiport doctor --fix` now self-registers `~/Applications/guiport.app` from
+  the active binary before firing TCC prompts, so Accessibility and Screen
+  Recording panes show a real `guiport` app entry even for Homebrew CLI installs.
 - **Windows beta.** New `GuiportWindowsAdapter` target backed by Win32: `apps` (EnumWindows + QueryFullProcessImageNameW), `click-at` / `type` / `hotkey` (SendInput, Unicode-aware including surrogate pairs), `screenshot` (GDI BitBlt for the virtual desktop, PrintWindow for a specific window). Wired into the executable via `#if os(Windows)`; non-Windows builds compile the target to nothing. CI now builds on `windows-2022` alongside macOS.
 - `scripts/install.ps1` — real PowerShell installer (clones, `swift build -c release`, drops binary in `%LOCALAPPDATA%\Programs\guiport`, adds to user PATH).
 - **Linux beta.** New `GuiportLinuxAdapter` target. Session-aware day-1 surface: `xdotool` + `wmctrl` + `scrot`/`import` on X11, `ydotool` + `grim` on Wayland. `apps` uses `wmctrl -lpG` on X11 and a `/proc` walk on Wayland. All shell-outs go through `Process` with discrete argv (never a shell), so user-supplied titles / type-text are safe even with metacharacters. CI now builds on `ubuntu-24.04` alongside macOS + Windows.

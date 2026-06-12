@@ -16,6 +16,7 @@ public struct MacAdapter: DesktopAdapter {
     public func promptAccessibility() -> Bool { AXBridge.promptAccessibilityIfNeeded() }
     public func hasScreenRecordingPermission() -> Bool { Screenshot.hasScreenRecordingPermission() }
     public func requestScreenRecordingPermission() -> Bool { Screenshot.requestScreenRecordingPermission() }
+    public func preparePermissionIdentity() -> String? { PermissionApp.installOrRefresh() }
 
     public func enrolScreenRecording() {
         // Side-effecting: fetch ScreenCaptureKit shareable content so macOS enrols
@@ -101,5 +102,78 @@ public struct MacAdapter: DesktopAdapter {
 
     public func startRecording(target: AppTarget, to path: String) throws {
         try Recorder.record(target: target, to: path)
+    }
+}
+
+enum PermissionApp {
+    static let bundleID = "com.edihasaj.guiport"
+
+    static func installOrRefresh() -> String? {
+        guard let executable = Bundle.main.executableURL else { return nil }
+        let fm = FileManager.default
+        let home = fm.homeDirectoryForCurrentUser
+        let app = home.appendingPathComponent("Applications/guiport.app", isDirectory: true)
+        let contents = app.appendingPathComponent("Contents", isDirectory: true)
+        let macOS = contents.appendingPathComponent("MacOS", isDirectory: true)
+        let resources = contents.appendingPathComponent("Resources", isDirectory: true)
+        let appExecutable = macOS.appendingPathComponent("guiport")
+        let plist = contents.appendingPathComponent("Info.plist")
+
+        do {
+            try fm.createDirectory(at: macOS, withIntermediateDirectories: true)
+            try fm.createDirectory(at: resources, withIntermediateDirectories: true)
+            if fm.fileExists(atPath: appExecutable.path) {
+                try fm.removeItem(at: appExecutable)
+            }
+            try fm.copyItem(at: executable, to: appExecutable)
+            try writeInfoPlist(to: plist)
+            try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: appExecutable.path)
+            _ = run("/usr/bin/codesign", ["--force", "--sign", "-", "--identifier", bundleID, appExecutable.path])
+            _ = run("/usr/bin/codesign", ["--force", "--sign", "-", "--identifier", bundleID, app.path])
+            _ = run("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister", ["-f", app.path])
+            return app.path
+        } catch {
+            return nil
+        }
+    }
+
+    private static func writeInfoPlist(to url: URL) throws {
+        let version = Guiport.version
+        let plist = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+          <key>CFBundleName</key><string>guiport</string>
+          <key>CFBundleDisplayName</key><string>guiport</string>
+          <key>CFBundleIdentifier</key><string>\(bundleID)</string>
+          <key>CFBundleExecutable</key><string>guiport</string>
+          <key>CFBundlePackageType</key><string>APPL</string>
+          <key>CFBundleVersion</key><string>\(version)</string>
+          <key>CFBundleShortVersionString</key><string>\(version)</string>
+          <key>LSMinimumSystemVersion</key><string>13.0</string>
+          <key>LSUIElement</key><true/>
+          <key>NSAccessibilityUsageDescription</key><string>guiport reads the macOS Accessibility tree of running apps so coding agents can inspect UI structure, click by selector, and replay tests deterministically.</string>
+          <key>NSScreenCaptureUsageDescription</key><string>guiport captures app windows for screenshots and on-device OCR fallback when an app's accessibility tree is sparse.</string>
+          <key>NSAppleEventsUsageDescription</key><string>guiport may activate target apps before sending input events so clicks and keystrokes route correctly.</string>
+        </dict>
+        </plist>
+        """
+        try plist.write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    private static func run(_ launchPath: String, _ arguments: [String]) -> Int32 {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: launchPath)
+        process.arguments = arguments
+        process.standardOutput = Pipe()
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus
+        } catch {
+            return 1
+        }
     }
 }

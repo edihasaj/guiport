@@ -19,6 +19,7 @@ public protocol DesktopAdapter: Sendable {
     func promptAccessibility() -> Bool
     func hasScreenRecordingPermission() -> Bool
     func requestScreenRecordingPermission() -> Bool
+    func preparePermissionIdentity() -> String?
     func openSystemSettings(for permission: PermissionKind)
 
     /// Force a screen-capture API call so macOS reliably enrols the binary into TCC.
@@ -113,6 +114,7 @@ public struct UnconfiguredAdapter: DesktopAdapter {
     public func promptAccessibility() -> Bool { false }
     public func hasScreenRecordingPermission() -> Bool { false }
     public func requestScreenRecordingPermission() -> Bool { false }
+    public func preparePermissionIdentity() -> String? { nil }
     public func openSystemSettings(for permission: PermissionKind) {}
     public func enrolScreenRecording() {}
 

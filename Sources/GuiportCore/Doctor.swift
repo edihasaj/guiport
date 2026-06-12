@@ -49,6 +49,7 @@ public enum Doctor {
     /// wasn't already there).
     public static func fix() -> DoctorReport {
         let a = Adapter.current
+        _ = a.preparePermissionIdentity()
         if !a.isAccessibilityTrusted() {
             _ = a.promptAccessibility()
             a.openSystemSettings(for: .accessibility)

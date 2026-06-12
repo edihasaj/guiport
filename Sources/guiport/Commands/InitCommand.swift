@@ -24,7 +24,8 @@ struct InitCommand: AsyncParsableCommand {
         print(report.humanReport())
         print("")
         print("→ System Settings was opened for any missing permissions.")
-        print("→ Look for `guiport` in the list (or your terminal app, if it shows there instead) and toggle it on.")
+        print("→ Look for `guiport` in the list and toggle it on.")
+        print("→ If it was missing, init registered ~/Applications/guiport.app for the permission panes.")
         print("→ Then re-run `guiport doctor` to confirm.")
         if !report.ok { throw ExitCode(1) }
     }

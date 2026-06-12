@@ -50,6 +50,10 @@ guiport doctor --fix   # opens the right Privacy panes
 guiport doctor         # all green when ready
 ```
 
+`doctor --fix` also registers `~/Applications/guiport.app` so macOS shows a
+real `guiport` app entry in Accessibility and Screen Recording instead of only
+the invoking terminal.
+
 Windows (beta — input/screenshot/apps; UIA tree pending):
 
 ```powershell
@@ -119,6 +123,8 @@ OCR-found bounds drift across font/scale changes, so prefer AX selectors for rep
 - **Screen Recording** — required for `screenshot` and screenshot-on-failure artifacts.
 
 Run `guiport doctor` to check status and get System Settings deep links.
+Run `guiport doctor --fix` to register `~/Applications/guiport.app` and trigger
+the missing permission prompts.
 
 ## Driving input from a background agent
 
