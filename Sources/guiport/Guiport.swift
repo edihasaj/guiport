@@ -36,6 +36,8 @@ struct Guiport: AsyncParsableCommand {
             RecordCommand.self,
             RunCommand.self,
             ServeCommand.self,
+            AgentCommand.self,
+            AgentDaemonCommand.self,
             BenchCommand.self,
             LifecycleCommand.self,
             LogsCommand.self,

@@ -9,17 +9,9 @@ enum Input {
 
     static func click(_ node: AXNode, app: AppTarget, button: String, count: Int, useAXPress: Bool) throws -> InputResult {
         try Doctor.ensureAccessibilityOrThrow()
-        // Only raise the target app if it isn't already frontmost — activating
-        // on every click adds tens of ms and steals focus needlessly in a test
-        // loop. When we DO activate, give the window a brief beat to come
-        // forward so the click lands on it, not whatever it covered.
-        if NSWorkspace.shared.frontmostApplication?.processIdentifier != app.pid,
-           let running = NSRunningApplication(processIdentifier: app.pid) {
-            running.activate(options: [])
-            usleep(40_000)
-        }
 
         if useAXPress {
+            activateIfNeeded(app.pid)
             guard let element = try AXBridge.locate(in: app, id: node.id) else {
                 throw GuiportError(code: "stale_node", message: "could not relocate element id \(node.id)")
             }
@@ -31,10 +23,12 @@ enum Input {
         }
 
         // Fast path: usable on-screen bounds → synthesize a click at center.
+        // emitMouse activates the app and posts the event — directly when this
+        // process can reach the screen, or via the Aqua agent daemon otherwise.
         if let bounds = node.bounds, bounds.width > 1, bounds.height > 1 {
             let center = CGPoint(x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2)
-            try postClick(at: center, button: parseButton(button), clickCount: max(1, count))
-            return InputResult(action: "click", ok: true, detail: "synthetic at \(Int(center.x)),\(Int(center.y))", target: node.id)
+            let detail = try emitMouse(at: center, button: button, count: count, activatePid: app.pid)
+            return InputResult(action: "click", ok: true, detail: detail, target: node.id)
         }
 
         // No usable bounds — element is collapsed or scrolled out of view.
@@ -49,8 +43,8 @@ enum Input {
         AXUIElementPerformAction(element, "AXScrollToVisible" as CFString)
         if let fresh = AXBridge.bounds(of: element), fresh.width > 1, fresh.height > 1 {
             let center = CGPoint(x: fresh.x + fresh.width / 2, y: fresh.y + fresh.height / 2)
-            try postClick(at: center, button: parseButton(button), clickCount: max(1, count))
-            return InputResult(action: "click", ok: true, detail: "synthetic after scroll-into-view at \(Int(center.x)),\(Int(center.y))", target: node.id)
+            let detail = try emitMouse(at: center, button: button, count: count, activatePid: app.pid)
+            return InputResult(action: "click", ok: true, detail: "scroll-into-view; \(detail)", target: node.id)
         }
         let err = AXUIElementPerformAction(element, kAXPressAction as CFString)
         if err == .success {
@@ -67,12 +61,16 @@ enum Input {
 
     static func clickAt(x: Double, y: Double, button: String = "left", count: Int = 1) throws -> InputResult {
         try Doctor.ensureAccessibilityOrThrow()
-        try postClick(at: CGPoint(x: x, y: y), button: parseButton(button), clickCount: max(1, count))
-        return InputResult(action: "click-at", ok: true, detail: "synthetic at \(Int(x)),\(Int(y))", target: nil)
+        let detail = try emitMouse(at: CGPoint(x: x, y: y), button: button, count: count, activatePid: nil)
+        return InputResult(action: "click-at", ok: true, detail: detail, target: nil)
     }
 
     static func type(_ text: String, perCharDelayMs: Int) throws -> InputResult {
         try Doctor.ensureAccessibilityOrThrow()
+        if SessionBridge.shouldForward() {
+            try SessionBridge.send(["op": "type", "text": text, "delayMs": perCharDelayMs])
+            return InputResult(action: "type", ok: true, detail: "\(text.count) chars (via agent)", target: nil)
+        }
         guard let source = CGEventSource(stateID: .hidSystemState) else {
             throw GuiportError(code: "event_source", message: "could not create CGEventSource")
         }
@@ -90,6 +88,10 @@ enum Input {
 
     static func hotkey(_ combo: String) throws -> InputResult {
         try Doctor.ensureAccessibilityOrThrow()
+        if SessionBridge.shouldForward() {
+            try SessionBridge.send(["op": "hotkey", "combo": combo])
+            return InputResult(action: "hotkey", ok: true, detail: "\(combo) (via agent)", target: nil)
+        }
         let parts = combo.lowercased().split(separator: "+").map { $0.trimmingCharacters(in: .whitespaces) }
         guard !parts.isEmpty else {
             throw GuiportError(code: "hotkey_empty", message: "empty combo")
@@ -126,6 +128,58 @@ enum Input {
         down?.post(tap: .cghidEventTap)
         up?.post(tap: .cghidEventTap)
         return InputResult(action: "hotkey", ok: true, detail: combo, target: nil)
+    }
+
+    // MARK: - Session-bridged emit
+
+    /// Post a click either directly (when this process can reach the screen) or
+    /// by forwarding to the Aqua agent daemon (when it can't). Returns a detail
+    /// string for the InputResult. `activatePid`, when set and not already
+    /// frontmost, raises that app first so the click lands on it.
+    private static func emitMouse(at p: CGPoint, button: String, count: Int, activatePid: Int32?) throws -> String {
+        if SessionBridge.shouldForward() {
+            try SessionBridge.send([
+                "op": "mouse",
+                "x": Double(p.x), "y": Double(p.y),
+                "button": button, "clickCount": max(1, count),
+                "activatePid": Int(activatePid ?? 0),
+            ])
+            return "via agent at \(Int(p.x)),\(Int(p.y))"
+        }
+        activateIfNeeded(activatePid)
+        try postClick(at: p, button: parseButton(button), clickCount: max(1, count))
+        return "synthetic at \(Int(p.x)),\(Int(p.y))"
+    }
+
+    /// Raise the target app when it isn't already frontmost, then give the
+    /// window a brief beat to come forward so the click lands on it.
+    private static func activateIfNeeded(_ pid: Int32?) {
+        guard let pid, pid != 0,
+              NSWorkspace.shared.frontmostApplication?.processIdentifier != pid,
+              let running = NSRunningApplication(processIdentifier: pid) else { return }
+        running.activate(options: [])
+        usleep(40_000)
+    }
+
+    /// Dispatch an op received by the Aqua agent daemon. Runs in the daemon
+    /// process (graphic access), where the same Input.* paths post locally.
+    static func executeForwardedOp(_ op: [String: Any]) throws {
+        switch op["op"] as? String {
+        case "mouse":
+            let x = (op["x"] as? Double) ?? 0
+            let y = (op["y"] as? Double) ?? 0
+            let button = (op["button"] as? String) ?? "left"
+            let count = (op["clickCount"] as? Int) ?? 1
+            let pidRaw = (op["activatePid"] as? Int) ?? 0
+            _ = try emitMouse(at: CGPoint(x: x, y: y), button: button, count: count,
+                              activatePid: pidRaw == 0 ? nil : Int32(pidRaw))
+        case "type":
+            _ = try type((op["text"] as? String) ?? "", perCharDelayMs: (op["delayMs"] as? Int) ?? 0)
+        case "hotkey":
+            _ = try hotkey((op["combo"] as? String) ?? "")
+        default:
+            throw GuiportError(code: "daemon_unknown_op", message: "unknown op \(op["op"] as? String ?? "nil")")
+        }
     }
 
     // MARK: - Helpers
