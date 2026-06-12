@@ -86,6 +86,16 @@ jobs:
           key: spm-release-${{ runner.os }}-${{ hashFiles('Package.resolved', 'Package.swift') }}
           restore-keys: spm-release-${{ runner.os }}-
 
+      - name: Stamp Info.plist version
+        env:
+          NEXT: ${{ needs.bump.outputs.next }}
+        run: |
+          set -euo pipefail
+          # Keep the embedded bundle version (shown in permission lists / Get Info)
+          # in sync with the release so guiport reports a real version everywhere.
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $NEXT" Resources/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEXT" Resources/Info.plist
+
       - name: Build universal release binary
         run: swift build -c release --arch arm64 --arch x86_64
 
@@ -145,6 +155,19 @@ jobs:
             "$bindir/guiport"
           codesign --verify --strict --verbose=2 "$bindir/guiport"
           codesign -dv --verbose=4 "$bindir/guiport" 2>&1 | grep -E 'Identifier|TeamIdentifier'
+
+      # No Developer-ID cert: still ad-hoc sign with the STABLE bundle identifier
+      # (matching the embedded Info.plist + guiport.app) so macOS groups guiport's
+      # TCC entries under one identity — consistent name + icon everywhere —
+      # instead of the bare "guiport" ad-hoc default. (cdhash still changes each
+      # build, so grants reset on upgrade until the Developer-ID secret is added.)
+      - name: Ad-hoc sign with stable bundle identifier
+        if: steps.cert.outputs.signed != 'true'
+        run: |
+          set -euo pipefail
+          bindir=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)
+          codesign --force --sign - --identifier com.edihasaj.guiport "$bindir/guiport"
+          codesign -dv "$bindir/guiport" 2>&1 | grep -E 'Identifier'
 
       - name: Package tarball
         id: pkg
