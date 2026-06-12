@@ -120,6 +120,32 @@ OCR-found bounds drift across font/scale changes, so prefer AX selectors for rep
 
 Run `guiport doctor` to check status and get System Settings deep links.
 
+## Driving input from a background agent
+
+macOS posts synthetic events into the *caller's* security session. A coding
+agent (or SSH shell, or CI runner) usually runs in a **Background** launchd
+session, so it can read AX trees from anywhere but its clicks/keystrokes never
+reach the on-screen app — they go to the wrong session.
+
+`guiport agent` solves this with a tiny daemon that runs in the logged-in
+**Aqua** (GUI) session via a LaunchAgent. The CLI does all the AX work locally
+(resolve the element, compute the point — session-agnostic) and forwards only
+the final low-level event over a Unix socket; the daemon posts it where it
+lands. A `guiport` invoked from a real Terminal in the GUI session skips the
+bridge entirely (zero overhead).
+
+```sh
+guiport agent install     # run once; writes a LaunchAgent + starts the daemon
+guiport agent status      # installed / running / socket
+```
+
+The daemon needs its **own** Accessibility grant — launchd is its parent, so
+it can't inherit the grant from a granted terminal the way a foreground CLI
+does. After `agent install`, enable **guiport** under System Settings →
+Privacy & Security → Accessibility. A Developer-ID-signed build keeps that
+grant stable across `brew upgrade`. Then `guiport click/type/hotkey` from any
+background process lands on screen.
+
 ## Architecture
 
 - Pure Swift, single binary.
