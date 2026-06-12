@@ -38,6 +38,12 @@ public protocol DesktopAdapter: Sendable {
     func observe(target: AppTarget) throws -> AXSummary
     func tree(target: AppTarget, maxDepth: Int, includeHidden: Bool, scope: TreeScope) throws -> AXNode
 
+    /// Return the first node matching `selector`, ideally via an early-exit
+    /// walk so deep Chromium/Electron trees don't have to be fully built and
+    /// serialized just to resolve one click target. A default implementation
+    /// (full tree + match) is provided; adapters override for speed.
+    func firstMatch(target: AppTarget, selector: Selector, maxDepth: Int, scope: TreeScope) throws -> AXNode?
+
     // MARK: - Input
 
     func click(node: AXNode, app: AppTarget, button: String, count: Int, useAXPress: Bool) throws -> InputResult
@@ -63,6 +69,12 @@ public extension DesktopAdapter {
     }
     func clickAt(x: Double, y: Double) throws -> InputResult {
         try clickAt(x: x, y: y, button: "left", count: 1)
+    }
+    /// Default first-match: build the full tree and take the first match.
+    /// Adapters with a faster path (e.g. macOS early-exit AX walk) override.
+    func firstMatch(target: AppTarget, selector: Selector, maxDepth: Int, scope: TreeScope) throws -> AXNode? {
+        let t = try tree(target: target, maxDepth: maxDepth, includeHidden: false, scope: scope)
+        return selector.match(t).first
     }
     func tree(target: AppTarget) throws -> AXNode {
         try tree(target: target, maxDepth: 30, includeHidden: false, scope: .auto)

@@ -143,6 +143,14 @@ public struct Selector {
         for c in node.children { collect(c, into: &out) }
     }
 
+    /// Evaluate this selector's role + predicates against a single node
+    /// (ignoring `index`, which is positional across a whole traversal).
+    /// Exposed so adapters can match during an early-exit tree walk instead
+    /// of building the full tree first.
+    public func matchesNode(_ node: AXNode) -> Bool {
+        matches(node)
+    }
+
     private func matches(_ node: AXNode) -> Bool {
         if let role {
             // exact match on role or subrole

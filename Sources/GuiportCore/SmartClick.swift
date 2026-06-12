@@ -26,9 +26,10 @@ public enum SmartClick {
                              scope: TreeScope = .auto) throws -> SmartClickResult {
         let parsed = try Selector.parse(selector)
 
-        // Try AX first.
-        let tree = try TreeCache.shared.tree(target: target, maxDepth: 30, includeHidden: false, scope: scope)
-        if let m = parsed.match(tree).first {
+        // Try AX first — early-exit walk that stops at the first matching node
+        // instead of building and serializing the whole tree just to click one
+        // element (the latency lever on deep Chromium/Electron trees).
+        if let m = try Adapter.current.firstMatch(target: target, selector: parsed, maxDepth: 30, scope: scope) {
             _ = try Adapter.current.click(node: m, app: target, button: button, count: count, useAXPress: useAXPress)
             TreeCache.shared.invalidate(pid: target.pid)
             return SmartClickResult(path: "ax", selector: selector, detail: m.name ?? m.identifier, target: m.id)

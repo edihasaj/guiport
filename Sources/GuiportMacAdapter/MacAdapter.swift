@@ -63,6 +63,10 @@ public struct MacAdapter: DesktopAdapter {
         try AXBridge.tree(target: target, maxDepth: maxDepth, includeHidden: includeHidden, scope: scope)
     }
 
+    public func firstMatch(target: AppTarget, selector: GuiportCore.Selector, maxDepth: Int, scope: TreeScope) throws -> AXNode? {
+        try AXBridge.findFirst(target: target, selector: selector, maxDepth: maxDepth, scope: scope)
+    }
+
     // MARK: - Input
 
     public func click(node: AXNode, app: AppTarget, button: String, count: Int, useAXPress: Bool) throws -> InputResult {

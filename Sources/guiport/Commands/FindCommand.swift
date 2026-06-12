@@ -33,13 +33,20 @@ struct FindCommand: AsyncParsableCommand {
         let parsed = try Selector.parse(selector)
         let scope: TreeScope = tray ? .tray : .auto
 
-        let tree = noCache
-            ? try Adapter.current.tree(target: target, maxDepth: maxDepth, includeHidden: false, scope: scope)
-            : try TreeCache.shared.tree(target: target, maxDepth: maxDepth, includeHidden: false, scope: scope)
-
         struct Hit: Encodable { let path: String; let node: AXNode? ; let ocr: OCRMatch? }
-        var hits: [Hit] = parsed.match(tree).map { Hit(path: "ax", node: $0, ocr: nil) }
-        if !all { hits = Array(hits.prefix(1)) }
+        var hits: [Hit]
+        if all {
+            // Full set: build the tree once and collect every match.
+            let tree = noCache
+                ? try Adapter.current.tree(target: target, maxDepth: maxDepth, includeHidden: false, scope: scope)
+                : try TreeCache.shared.tree(target: target, maxDepth: maxDepth, includeHidden: false, scope: scope)
+            hits = parsed.match(tree).map { Hit(path: "ax", node: $0, ocr: nil) }
+        } else {
+            // First match only: early-exit walk — stops as soon as it hits,
+            // instead of building and serializing the whole tree.
+            hits = try Adapter.current.firstMatch(target: target, selector: parsed, maxDepth: maxDepth, scope: scope)
+                .map { [Hit(path: "ax", node: $0, ocr: nil)] } ?? []
+        }
 
         // Auto visual fallback when AX misses, Screen Recording is granted, and not strict.
         if hits.isEmpty, !strict,

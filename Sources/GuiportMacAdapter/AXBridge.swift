@@ -78,6 +78,92 @@ enum AXBridge {
         return walk(root, depth: 0, maxDepth: maxDepth, path: "/", counter: &pathCounter, includeHidden: includeHidden)
     }
 
+    /// Early-exit search for the first node matching `selector`. Walks the raw
+    /// AX tree depth-first, evaluating the selector as it goes, and returns the
+    /// moment it matches — so a click target near the top of a huge
+    /// Chromium/Electron tree costs a handful of nodes instead of building and
+    /// serializing the whole thing.
+    ///
+    /// Path ids match `tree()` exactly: the per-parent PathCounter is advanced
+    /// for every element (same as `walk`), so a returned `id` is relocatable by
+    /// `locate()` for AXPress. Truly-empty nodes (no bounds, name, value,
+    /// identifier, or description) are skipped from matching — they can't be a
+    /// meaningful click target — but their subtrees are still searched.
+    static func findFirst(target: AppTarget, selector: GuiportCore.Selector, maxDepth: Int = 30, scope: TreeScope = .auto) throws -> AXNode? {
+        try requireTrusted()
+        let appElement = AXUIElementCreateApplication(target.pid)
+        enableElectronAX(appElement)
+        let root = chooseRoot(appElement: appElement, target: target, scope: scope)
+        var counter = PathCounter()
+        var matchOrdinal = 0
+        return walkFirst(root, depth: 0, maxDepth: maxDepth, path: "/",
+                         counter: &counter, selector: selector,
+                         wantIndex: selector.index, matchOrdinal: &matchOrdinal)
+    }
+
+    private static func walkFirst(_ element: AXUIElement,
+                                  depth: Int,
+                                  maxDepth: Int,
+                                  path: String,
+                                  counter: inout PathCounter,
+                                  selector: GuiportCore.Selector,
+                                  wantIndex: Int?,
+                                  matchOrdinal: inout Int) -> AXNode? {
+        let a = batchFetch(element)
+        let role = cfStr(a[0]) ?? "Unknown"
+        let name = cfStr(a[2])
+        let value = cfStr(a[3])
+        let identifier = cfStr(a[4])
+        let desc = cfStr(a[5])
+        let b = cfBounds(pos: a[7], size: a[8])
+
+        let n = counter.next(parent: path, role: role)
+        let segment = "\(role)[\(n)]"
+        let nodePath = path == "/" ? "/\(segment)" : "\(path)/\(segment)"
+
+        // Skip truly-empty nodes from matching (mirrors tree()'s hidden filter),
+        // but still walk into them — a bare container can hold real descendants.
+        let isEmpty = b == nil && (name?.isEmpty ?? true) && (value?.isEmpty ?? true)
+            && (identifier?.isEmpty ?? true) && (desc?.isEmpty ?? true)
+        if !isEmpty {
+            let candidate = AXNode(
+                id: nodePath, role: role, subrole: cfStr(a[1]), name: name, value: value,
+                identifier: identifier, description: desc, help: cfStr(a[6]), bounds: b,
+                enabled: cfBool(a[9]), focused: cfBool(a[10]), selected: cfBool(a[11]),
+                actions: [], children: [])
+            if selector.matchesNode(candidate) {
+                if let wi = wantIndex {
+                    if matchOrdinal == wi {
+                        return AXNode(
+                            id: nodePath, role: role, subrole: candidate.subrole, name: name, value: value,
+                            identifier: identifier, description: desc, help: candidate.help, bounds: b,
+                            enabled: candidate.enabled, focused: candidate.focused, selected: candidate.selected,
+                            actions: actions(of: element), children: [])
+                    }
+                    matchOrdinal += 1
+                } else {
+                    return AXNode(
+                        id: nodePath, role: role, subrole: candidate.subrole, name: name, value: value,
+                        identifier: identifier, description: desc, help: candidate.help, bounds: b,
+                        enabled: candidate.enabled, focused: candidate.focused, selected: candidate.selected,
+                        actions: actions(of: element), children: [])
+                }
+            }
+        }
+
+        if depth < maxDepth, let arr = a[12] as? [AXUIElement] {
+            var childCounter = PathCounter()
+            for c in arr {
+                if let hit = walkFirst(c, depth: depth + 1, maxDepth: maxDepth, path: nodePath,
+                                       counter: &childCounter, selector: selector,
+                                       wantIndex: wantIndex, matchOrdinal: &matchOrdinal) {
+                    return hit
+                }
+            }
+        }
+        return nil
+    }
+
     /// Resolve the AX root the caller wants to walk.
     /// - `.window`: the focused/titled window (current default behaviour).
     /// - `.tray`:   the app's menu-bar-extras (NSStatusItem area). Many menu-
