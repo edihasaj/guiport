@@ -30,12 +30,35 @@ enum Input {
             return InputResult(action: "click", ok: true, detail: "AXPress", target: node.id)
         }
 
-        guard let bounds = node.bounds else {
-            throw GuiportError(code: "no_bounds", message: "element has no bounds; use --press for AXPress")
+        // Fast path: usable on-screen bounds → synthesize a click at center.
+        if let bounds = node.bounds, bounds.width > 1, bounds.height > 1 {
+            let center = CGPoint(x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2)
+            try postClick(at: center, button: parseButton(button), clickCount: max(1, count))
+            return InputResult(action: "click", ok: true, detail: "synthetic at \(Int(center.x)),\(Int(center.y))", target: node.id)
         }
-        let center = CGPoint(x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2)
-        try postClick(at: center, button: parseButton(button), clickCount: max(1, count))
-        return InputResult(action: "click", ok: true, detail: "synthetic at \(Int(center.x)),\(Int(center.y))", target: node.id)
+
+        // No usable bounds — element is collapsed or scrolled out of view.
+        // Relocate it, ask its container to scroll it into view, and retry with
+        // fresh bounds; fall back to AXPress (which doesn't need coordinates).
+        guard let element = try AXBridge.locate(in: app, id: node.id) else {
+            throw GuiportError(code: "no_bounds",
+                               message: "element has no bounds and could not be relocated",
+                               hint: "pass --press to use AXPress, or re-`find` the element")
+        }
+        // kAXScrollToVisibleAction isn't bridged to Swift; use its raw name.
+        AXUIElementPerformAction(element, "AXScrollToVisible" as CFString)
+        if let fresh = AXBridge.bounds(of: element), fresh.width > 1, fresh.height > 1 {
+            let center = CGPoint(x: fresh.x + fresh.width / 2, y: fresh.y + fresh.height / 2)
+            try postClick(at: center, button: parseButton(button), clickCount: max(1, count))
+            return InputResult(action: "click", ok: true, detail: "synthetic after scroll-into-view at \(Int(center.x)),\(Int(center.y))", target: node.id)
+        }
+        let err = AXUIElementPerformAction(element, kAXPressAction as CFString)
+        if err == .success {
+            return InputResult(action: "click", ok: true, detail: "AXPress (no bounds)", target: node.id)
+        }
+        throw GuiportError(code: "no_bounds",
+                           message: "element has no clickable bounds; AXPress fallback also failed (\(err.rawValue))",
+                           hint: "the element may be disabled or not actionable")
     }
 
     // MARK: - Type
