@@ -117,6 +117,7 @@ enum PermissionApp {
         let macOS = contents.appendingPathComponent("MacOS", isDirectory: true)
         let resources = contents.appendingPathComponent("Resources", isDirectory: true)
         let appExecutable = macOS.appendingPathComponent("guiport")
+        let appIcon = resources.appendingPathComponent("guiport.icns")
         let plist = contents.appendingPathComponent("Info.plist")
 
         do {
@@ -126,6 +127,12 @@ enum PermissionApp {
                 try fm.removeItem(at: appExecutable)
             }
             try fm.copyItem(at: executable, to: appExecutable)
+            if let icon = findIcon(), fm.fileExists(atPath: icon.path) {
+                if fm.fileExists(atPath: appIcon.path) {
+                    try fm.removeItem(at: appIcon)
+                }
+                try fm.copyItem(at: icon, to: appIcon)
+            }
             try writeInfoPlist(to: plist)
             try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: appExecutable.path)
             _ = run("/usr/bin/codesign", ["--force", "--sign", "-", "--identifier", bundleID, appExecutable.path])
@@ -151,6 +158,7 @@ enum PermissionApp {
           <key>CFBundlePackageType</key><string>APPL</string>
           <key>CFBundleVersion</key><string>\(version)</string>
           <key>CFBundleShortVersionString</key><string>\(version)</string>
+          <key>CFBundleIconFile</key><string>guiport</string>
           <key>LSMinimumSystemVersion</key><string>13.0</string>
           <key>LSUIElement</key><true/>
           <key>NSAccessibilityUsageDescription</key><string>guiport reads the macOS Accessibility tree of running apps so coding agents can inspect UI structure, click by selector, and replay tests deterministically.</string>
@@ -160,6 +168,23 @@ enum PermissionApp {
         </plist>
         """
         try plist.write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    private static func findIcon() -> URL? {
+        let fm = FileManager.default
+        var candidates: [URL] = [
+            URL(fileURLWithPath: "/opt/homebrew/share/guiport/icon.icns"),
+            URL(fileURLWithPath: "/usr/local/share/guiport/icon.icns"),
+            fm.homeDirectoryForCurrentUser.appendingPathComponent("Projects/guiport/assets/icon.icns"),
+        ]
+        if let executable = Bundle.main.executableURL {
+            var cursor = executable.deletingLastPathComponent()
+            for _ in 0..<8 {
+                candidates.append(cursor.appendingPathComponent("assets/icon.icns"))
+                cursor.deleteLastPathComponent()
+            }
+        }
+        return candidates.first { fm.fileExists(atPath: $0.path) }
     }
 
     private static func run(_ launchPath: String, _ arguments: [String]) -> Int32 {

@@ -19,6 +19,7 @@ class Guiport < Formula
   def install
     system "swift", "build", "--disable-sandbox", "-c", "release"
     bin.install ".build/release/guiport"
+    pkgshare.install "assets/icon.icns"
   end
 
   def caveats
