@@ -134,9 +134,17 @@ jobs:
           # Prepend our keychain to the search list so codesign resolves the identity.
           security list-keychains -d user -s "$keychain" \
             $(security list-keychains -d user | sed -e 's/[[:space:]]*"//' -e 's/"//')
-          id=$(security find-identity -v -p codesigning "$keychain" \
-            | grep -oE '"Developer ID Application: [^"]+"' | head -1 | tr -d '"')
-          [ -n "$id" ] || { echo "no Developer ID Application identity in p12" >&2; exit 1; }
+          # List identities WITHOUT -v: the temp keychain holds the leaf + key
+          # but not Apple's Developer ID intermediate, so `-v` (valid-only) finds
+          # nothing. codesign still builds the chain from the runner's system
+          # certs. `|| true` keeps `set -e` from aborting on an empty grep.
+          id=$(security find-identity -p codesigning "$keychain" \
+            | grep -oE '"Developer ID Application: [^"]+"' | head -1 | tr -d '"' || true)
+          if [ -z "$id" ]; then
+            echo "no Developer ID Application identity in p12; identities present:" >&2
+            security find-identity "$keychain" >&2 || true
+            exit 1
+          fi
           echo "::add-mask::$id"
           echo "identity=$id" >> "$GITHUB_OUTPUT"
           echo "signed=true" >> "$GITHUB_OUTPUT"
