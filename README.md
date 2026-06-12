@@ -165,6 +165,11 @@ background process lands on screen.
 - No autonomous Manus clone.
 - No background/session-0 automation.
 
+## Related
+
+- [**shotport**](https://github.com/edihasaj/shotport) — token-cheap screenshot capture for agents. Calls `guiport` for macOS app/desktop pixels and accessibility text, then extracts text first and budgets the image to a token limit.
+- [**vmlab**](https://github.com/edihasaj/vmlab) — cross-OS verify orchestrator; drives `guiport` through its `guiport` transport.
+
 ## License
 
 MIT — see LICENSE.
