@@ -4,6 +4,16 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Changed
+- Release binaries are now signed with the team **Developer ID Application**
+  certificate (Applifyer, LLC — team `T8J48M4QVY`) instead of ad-hoc. This gives
+  guiport a stable certificate-based designated requirement, so macOS keeps
+  Accessibility and Screen Recording (TCC) grants across `brew upgrade` instead
+  of resetting them on every cdhash change. CI imports the cert from the
+  `MACOS_CERT_P12_BASE64` / `MACOS_CERT_PASSWORD` secrets (sourced from the
+  team's `apple-codesign` 1Password vault); unset secrets still fall back to a
+  stable-identifier ad-hoc signature.
+
 ### Added
 - `guiport doctor --fix` now self-registers `~/Applications/guiport.app` from
   the active binary before firing TCC prompts, so Accessibility and Screen
