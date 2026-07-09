@@ -33,6 +33,17 @@ enum ScreenCapture {
         }
     }
 
+    /// Non-prompting probe: attempt a tiny real capture and report whether it
+    /// succeeded. Unlike `CGPreflightScreenCaptureAccess()`, an `SCScreenshotManager`
+    /// capture is evaluated against guiport's own TCC identity rather than the host
+    /// terminal's, so it reflects guiport's actual grant. Errors are swallowed.
+    static func canCapture() -> Bool {
+        if #available(macOS 14.0, *) {
+            return (try? captureDisplay(CGMainDisplayID(), scale: 0.02)) != nil
+        }
+        return CGDisplayCreateImage(CGMainDisplayID()) != nil
+    }
+
     /// Capture a full display by its `CGDirectDisplayID`.
     static func captureDisplay(_ displayID: CGDirectDisplayID, scale: CGFloat) throws -> CGImage {
         if #available(macOS 14.0, *) {

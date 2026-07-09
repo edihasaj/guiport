@@ -14,7 +14,16 @@ enum Screenshot {
     }
 
     static func hasScreenRecordingPermission() -> Bool {
-        return CGPreflightScreenCaptureAccess()
+        // `CGPreflightScreenCaptureAccess()` is a legacy CoreGraphics probe: it is
+        // evaluated against the *responsible* host process (the terminal that spawned
+        // the CLI) and ignores path-only TCC grants, so it reports "denied" even when
+        // guiport's own binary is granted but the hosting terminal is not. When it
+        // says yes, trust it; when it says no, fall back to an actual ScreenCaptureKit
+        // probe, which is evaluated against guiport's OWN identity (matching the real
+        // capture path). Avoids false negatives when run from a terminal that lacks
+        // its own Screen Recording grant.
+        if CGPreflightScreenCaptureAccess() { return true }
+        return ScreenCapture.canCapture()
     }
 
     static func requestScreenRecordingPermission() -> Bool {

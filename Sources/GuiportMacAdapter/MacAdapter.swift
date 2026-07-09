@@ -121,6 +121,16 @@ enum PermissionApp {
         let plist = contents.appendingPathComponent("Info.plist")
 
         do {
+            // Remove any pre-existing bundle wholesale before rebuilding. A stale
+            // bundle from an older version can carry a dangling `Contents/MacOS`
+            // symlink (pointing at a since-removed Cellar path); `fileExists` follows
+            // that symlink and reports false, so a per-file `copyItem` would throw
+            // "file exists" and abort the whole refresh silently. Nuking first
+            // guarantees the version, icon, and signature are rebuilt from the
+            // currently running binary.
+            if fm.fileExists(atPath: app.path) {
+                try? fm.removeItem(at: app)
+            }
             try fm.createDirectory(at: macOS, withIntermediateDirectories: true)
             try fm.createDirectory(at: resources, withIntermediateDirectories: true)
             if fm.fileExists(atPath: appExecutable.path) {

@@ -48,6 +48,12 @@ struct Guiport: AsyncParsableCommand {
 
     /// Install the platform adapter once per process before any subcommand runs.
     static func main() async {
+        #if canImport(GuiportMacAdapter)
+        // Become our own responsible process before doing anything else, so macOS
+        // evaluates guiport's own Screen Recording grant instead of the host
+        // terminal's. Re-execs (once) only for screen-capture commands.
+        Responsibility.disclaimIfNeeded(arguments: CommandLine.arguments)
+        #endif
         installAdapter()
         await Self._mainAsync()
     }

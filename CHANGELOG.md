@@ -27,6 +27,24 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
   the project icon so macOS permission panes show the guiport logo.
 
 ### Fixed
+- **Screen Recording now works regardless of the launching terminal.** macOS
+  attributes Screen Recording *enforcement* to the responsible process — for a
+  CLI, the terminal that spawned it — so a terminal lacking (or denied) the grant
+  blocked guiport even when guiport's own identity was authorized (Accessibility
+  was unaffected, since it is judged on the calling binary). Moving capture to
+  ScreenCaptureKit enrolled `com.edihasaj.guiport` as its own TCC subject but did
+  not change enforcement, so capture could still fail behind a denied terminal.
+  guiport now disclaims responsibility from its parent and re-execs itself
+  (`responsibility_spawnattrs_setdisclaim`) for the `screenshot`, `record`, and
+  `doctor` commands, becoming its own responsible process so macOS evaluates
+  guiport's own grant. The permission check also falls back to a ScreenCaptureKit
+  probe (guiport's own identity) when the legacy `CGPreflightScreenCaptureAccess`
+  (terminal identity) returns a false negative.
+- `doctor --fix` now rebuilds `~/Applications/guiport.app` from scratch. A stale
+  wrapper from an older version — e.g. a dangling `Contents/MacOS/guiport` symlink
+  into a since-removed Cellar path — made `fileExists` (which follows symlinks)
+  report the exec missing, so the copy threw "file exists" and the whole refresh
+  was silently swallowed. The registration now removes any existing bundle first.
 - macOS TCC identity now uses `com.edihasaj.guiport` consistently in the CLI
   binary and app wrapper, so Screen Recording grants apply to `guiport doctor`
   and screenshot commands.
