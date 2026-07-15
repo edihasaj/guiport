@@ -67,7 +67,8 @@ public struct LinuxAdapter: DesktopAdapter {
         try LinuxInput.clickAt(x: x, y: y, button: button, count: count)
     }
 
-    public func type(text: String, perCharDelayMs: Int) throws -> InputResult {
+    public func type(text: String, perCharDelayMs: Int, method: TypeMethod) throws -> InputResult {
+        // method is macOS-only for now (paste vs keystroke); Linux keystrokes.
         try LinuxInput.type(text, perCharDelayMs: perCharDelayMs)
     }
 
