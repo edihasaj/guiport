@@ -32,6 +32,7 @@ public struct LinuxAdapter: DesktopAdapter {
     public func promptAccessibility() -> Bool { true }
     public func hasScreenRecordingPermission() -> Bool { LinuxSession.current != .none }
     public func requestScreenRecordingPermission() -> Bool { true }
+    public func preparePermissionIdentity() -> String? { nil }
     public func enrolScreenRecording() {}
     public func openSystemSettings(for permission: PermissionKind) {}
 

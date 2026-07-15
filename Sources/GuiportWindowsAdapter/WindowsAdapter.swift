@@ -22,6 +22,7 @@ public struct WindowsAdapter: DesktopAdapter {
     public func promptAccessibility() -> Bool { true }
     public func hasScreenRecordingPermission() -> Bool { true }
     public func requestScreenRecordingPermission() -> Bool { true }
+    public func preparePermissionIdentity() -> String? { nil }
     public func enrolScreenRecording() {}
     public func openSystemSettings(for permission: PermissionKind) {}
 
