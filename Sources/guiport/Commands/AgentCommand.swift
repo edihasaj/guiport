@@ -32,7 +32,13 @@ struct AgentCommand: AsyncParsableCommand {
         return URL(fileURLWithPath: argv0).resolvingSymlinksInPath().path
     }
 
-    static func currentUID() -> String { String(getuid()) }
+    static func currentUID() -> String {
+        #if os(Windows)
+        return "0"  // agent/LaunchAgent forwarding is macOS-only; UID is unused here.
+        #else
+        return String(getuid())
+        #endif
+    }
 
     /// Emit a JSON object (these management commands return mixed-type fields,
     /// so go through JSONSerialization rather than a typed Encodable).

@@ -17,8 +17,8 @@ struct AgentDaemonCommand: AsyncParsableCommand {
     )
 
     func run() async throws {
-        setenv("GUIPORT_AGENT_DAEMON", "1", 1)
         #if canImport(GuiportMacAdapter)
+        setenv("GUIPORT_AGENT_DAEMON", "1", 1)
         try SessionBridge.runDaemon()
         #else
         throw GuiportError(code: "unsupported", message: "agent-daemon is macOS-only")
