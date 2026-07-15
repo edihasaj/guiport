@@ -94,8 +94,39 @@ enum Input {
     private static func resolveMethod(_ requested: TypeMethod, text: String) -> TypeMethod {
         guard requested == .auto else { return requested }
         if text.contains("\n") { return .paste }
-        if focusedElementIsWebContent() { return .paste }
+        if focusedContextIsWebOrElectron() { return .paste }
         return .keystroke
+    }
+
+    /// Bundle ids of common Chromium/WebView/Electron desktop apps whose text
+    /// fields drop fast synthesized keystrokes. Detecting the frontmost app is
+    /// reliable even when the focused element's AXParent chain is broken (as it
+    /// often is in WebView2/Chromium — e.g. Teams).
+    private static let knownWebApps: Set<String> = [
+        "com.microsoft.teams2", "com.microsoft.teams",       // Teams (WebView2)
+        "com.tinyspeck.slackmacgap",                          // Slack
+        "com.microsoft.VSCode", "com.microsoft.VSCodeInsiders", // VS Code
+        "com.hnc.Discord", "com.discordapp.Discord",          // Discord
+        "com.github.GitHubClient",                            // GitHub Desktop
+        "notion.id", "md.obsidian", "com.spotify.client",
+        "com.figma.Desktop", "com.linear",
+    ]
+
+    /// True when text is about to land in web/Electron content — checked three
+    /// ways for coverage: the frontmost app's bundle id, an Electron framework
+    /// inside its bundle, and finally the focused element's AXWebArea ancestry
+    /// (browsers and anything not caught by the first two).
+    private static func focusedContextIsWebOrElectron() -> Bool {
+        if let app = NSWorkspace.shared.frontmostApplication {
+            if let bundleID = app.bundleIdentifier, knownWebApps.contains(bundleID) {
+                return true
+            }
+            if let bundleURL = app.bundleURL {
+                let electron = bundleURL.appendingPathComponent("Contents/Frameworks/Electron Framework.framework")
+                if FileManager.default.fileExists(atPath: electron.path) { return true }
+            }
+        }
+        return focusedElementIsWebContent()
     }
 
     private static func keystrokeType(_ text: String, perCharDelayMs: Int) throws {
