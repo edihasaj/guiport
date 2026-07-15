@@ -78,8 +78,8 @@ public struct MacAdapter: DesktopAdapter {
         try Input.clickAt(x: x, y: y, button: button, count: count)
     }
 
-    public func type(text: String, perCharDelayMs: Int) throws -> InputResult {
-        try Input.type(text, perCharDelayMs: perCharDelayMs)
+    public func type(text: String, perCharDelayMs: Int, method: TypeMethod) throws -> InputResult {
+        try Input.type(text, perCharDelayMs: perCharDelayMs, method: method)
     }
 
     public func hotkey(combo: String) throws -> InputResult {
@@ -136,7 +136,14 @@ enum PermissionApp {
             if fm.fileExists(atPath: appExecutable.path) {
                 try fm.removeItem(at: appExecutable)
             }
-            try fm.copyItem(at: executable, to: appExecutable)
+            // Copy the *resolved* binary, not the launch path. On Homebrew the
+            // running executable is a relative symlink (bin/guiport -> ../Cellar/…);
+            // copyItem preserves symlinks, so copying it verbatim lands a dangling
+            // ../Cellar link inside Contents/MacOS — an invalid bundle that
+            // LaunchServices rejects, so System Settings falls back to the generic
+            // (terminal) icon. Resolving first copies the real Mach-O.
+            let realExecutable = executable.resolvingSymlinksInPath()
+            try fm.copyItem(at: realExecutable, to: appExecutable)
             if let icon = findIcon(), fm.fileExists(atPath: icon.path) {
                 if fm.fileExists(atPath: appIcon.path) {
                     try fm.removeItem(at: appIcon)

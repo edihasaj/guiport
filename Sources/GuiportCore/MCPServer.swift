@@ -121,8 +121,9 @@ private enum Tools {
         tool(name: "click_text", desc: "OCR-find text and click its center.",
              props: ["app": ["type": "string"], "query": ["type": "string"], "exact": ["type": "boolean"]],
              required: ["query"]),
-        tool(name: "type", desc: "Type text into the focused element.",
-             props: ["text": ["type": "string"], "delay_ms": ["type": "integer"]],
+        tool(name: "type", desc: "Type text into the focused element. Pastes into web/Electron fields automatically so no characters drop.",
+             props: ["text": ["type": "string"], "delay_ms": ["type": "integer"],
+                     "method": ["type": "string"]],
              required: ["text"]),
         tool(name: "hotkey", desc: "Send a hotkey combo, e.g. cmd+shift+t.",
              props: ["combo": ["type": "string"]],
@@ -193,7 +194,8 @@ private enum Tools {
         case "type":
             guard let text = args["text"] as? String else { throw GuiportError(code: "missing_arg", message: "text required") }
             let delay = (args["delay_ms"] as? Int) ?? 0
-            return try JSONOutput.encode(try Adapter.current.type(text: text, perCharDelayMs: delay), pretty: true)
+            let method = TypeMethod(rawValue: (args["method"] as? String) ?? "auto") ?? .auto
+            return try JSONOutput.encode(try Adapter.current.type(text: text, perCharDelayMs: delay, method: method), pretty: true)
         case "hotkey":
             guard let combo = args["combo"] as? String else { throw GuiportError(code: "missing_arg", message: "combo required") }
             return try JSONOutput.encode(try Adapter.current.hotkey(combo: combo), pretty: true)

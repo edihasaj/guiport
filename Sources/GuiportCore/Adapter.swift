@@ -7,6 +7,18 @@ public enum PermissionKind: String, Sendable {
     case inputMonitoring
 }
 
+/// How `type` puts text on screen.
+/// - `auto`: the adapter decides — paste into web/Electron content (where fast
+///   per-key synthesis drops characters) and keystroke into native fields.
+/// - `keystroke`: synthesize one key event per character.
+/// - `paste`: place the text on the clipboard and ⌘V it in one shot, then
+///   restore the previous clipboard. Reliable for Electron/WebView apps.
+public enum TypeMethod: String, Sendable {
+    case auto
+    case keystroke
+    case paste
+}
+
 /// Single contract every desktop adapter implements. Add a Windows or Linux adapter by
 /// adopting this in its own target. Core code in this module never imports OS frameworks —
 /// it routes everything through `Adapter.current`.
@@ -49,7 +61,7 @@ public protocol DesktopAdapter: Sendable {
 
     func click(node: AXNode, app: AppTarget, button: String, count: Int, useAXPress: Bool) throws -> InputResult
     func clickAt(x: Double, y: Double, button: String, count: Int) throws -> InputResult
-    func type(text: String, perCharDelayMs: Int) throws -> InputResult
+    func type(text: String, perCharDelayMs: Int, method: TypeMethod) throws -> InputResult
     func hotkey(combo: String) throws -> InputResult
 
     // MARK: - Capture / OCR
@@ -67,6 +79,11 @@ public protocol DesktopAdapter: Sendable {
 public extension DesktopAdapter {
     func resolveApp(name: String?) throws -> AppTarget {
         try resolveApp(name: name, windowTitle: nil)
+    }
+    /// Type using the automatic method (paste into web/Electron content, keystroke
+    /// otherwise). Callers that don't care about the mechanism use this overload.
+    func type(text: String, perCharDelayMs: Int) throws -> InputResult {
+        try type(text: text, perCharDelayMs: perCharDelayMs, method: .auto)
     }
     func clickAt(x: Double, y: Double) throws -> InputResult {
         try clickAt(x: x, y: y, button: "left", count: 1)
@@ -129,7 +146,7 @@ public struct UnconfiguredAdapter: DesktopAdapter {
         throw unsupported("click")
     }
     public func clickAt(x: Double, y: Double, button: String, count: Int) throws -> InputResult { throw unsupported("click-at") }
-    public func type(text: String, perCharDelayMs: Int) throws -> InputResult { throw unsupported("type") }
+    public func type(text: String, perCharDelayMs: Int, method: TypeMethod) throws -> InputResult { throw unsupported("type") }
     public func hotkey(combo: String) throws -> InputResult { throw unsupported("hotkey") }
 
     public func captureScreenshot(target: AppTarget?, to path: String) throws -> ScreenshotResult {

@@ -65,23 +65,114 @@ enum Input {
         return InputResult(action: "click-at", ok: true, detail: detail, target: nil)
     }
 
-    static func type(_ text: String, perCharDelayMs: Int) throws -> InputResult {
+    /// Default per-character delay for the keystroke path. Zero-delay Unicode
+    /// injection outruns some apps' input queues and drops characters; a small
+    /// floor makes native typing reliable without being noticeably slow.
+    private static let defaultKeystrokeDelayMs = 6
+
+    static func type(_ text: String, perCharDelayMs: Int, method: TypeMethod = .auto) throws -> InputResult {
         try Doctor.ensureAccessibilityOrThrow()
         if SessionBridge.shouldForward() {
-            try SessionBridge.send(["op": "type", "text": text, "delayMs": perCharDelayMs])
+            // Resolve in the executing (daemon) process, which owns the focus/screen.
+            try SessionBridge.send(["op": "type", "text": text,
+                                    "delayMs": perCharDelayMs, "method": method.rawValue])
             return InputResult(action: "type", ok: true, detail: "\(text.count) chars (via agent)", target: nil)
         }
+        switch resolveMethod(method, text: text) {
+        case .paste:
+            return try pasteText(text)
+        default:
+            try keystrokeType(text, perCharDelayMs: perCharDelayMs)
+            return InputResult(action: "type", ok: true, detail: "\(text.count) chars", target: nil)
+        }
+    }
+
+    /// Decide how to inject text when the caller asked for `.auto`. Web/Electron
+    /// content (Teams, Slack, VS Code, any Chromium/WebView field) drops fast
+    /// synthesized keystrokes, so route it — and any multi-line text — through
+    /// the clipboard. Native fields keep the keystroke path.
+    private static func resolveMethod(_ requested: TypeMethod, text: String) -> TypeMethod {
+        guard requested == .auto else { return requested }
+        if text.contains("\n") { return .paste }
+        if focusedElementIsWebContent() { return .paste }
+        return .keystroke
+    }
+
+    private static func keystrokeType(_ text: String, perCharDelayMs: Int) throws {
         guard let source = CGEventSource(stateID: .hidSystemState) else {
             throw GuiportError(code: "event_source", message: "could not create CGEventSource")
         }
+        let delayMs = perCharDelayMs > 0 ? perCharDelayMs : defaultKeystrokeDelayMs
         // Prefer Unicode injection — works for arbitrary text without keymap concerns.
         for ch in text {
             try postUnicode(String(ch), source: source)
-            if perCharDelayMs > 0 {
-                usleep(useconds_t(perCharDelayMs * 1000))
-            }
+            usleep(useconds_t(delayMs * 1000))
         }
-        return InputResult(action: "type", ok: true, detail: "\(text.count) chars", target: nil)
+    }
+
+    /// Put `text` on the clipboard, ⌘V it, then restore the prior clipboard.
+    /// One paste event lands whole, so no characters are lost — the reliable
+    /// path for Electron/WebView editors.
+    private static func pasteText(_ text: String) throws -> InputResult {
+        let pb = NSPasteboard.general
+        let saved = snapshotPasteboard(pb)
+        pb.clearContents()
+        pb.setString(text, forType: .string)
+        _ = try hotkey("cmd+v")
+        usleep(120_000) // let the app consume the paste before we restore the clipboard
+        restorePasteboard(pb, saved)
+        return InputResult(action: "type", ok: true, detail: "\(text.count) chars (paste)", target: nil)
+    }
+
+    /// True when the system-wide focused element sits inside an `AXWebArea`
+    /// (Chromium/Electron/WebView web content). Best-effort — any failure means
+    /// "assume native".
+    private static func focusedElementIsWebContent() -> Bool {
+        let system = AXUIElementCreateSystemWide()
+        var focusedRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
+              let focused = focusedRef, CFGetTypeID(focused) == AXUIElementGetTypeID() else {
+            return false
+        }
+        var current: AXUIElement? = (focused as! AXUIElement)
+        var hops = 0
+        while let element = current, hops < 25 {
+            var roleRef: CFTypeRef?
+            if AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef) == .success,
+               let role = roleRef as? String, role == "AXWebArea" {
+                return true
+            }
+            var parentRef: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(element, kAXParentAttribute as CFString, &parentRef) == .success,
+                  let parent = parentRef, CFGetTypeID(parent) == AXUIElementGetTypeID() else {
+                return false
+            }
+            current = (parent as! AXUIElement)
+            hops += 1
+        }
+        return false
+    }
+
+    private static func snapshotPasteboard(_ pb: NSPasteboard) -> [[NSPasteboard.PasteboardType: Data]] {
+        guard let items = pb.pasteboardItems else { return [] }
+        return items.map { item in
+            var data: [NSPasteboard.PasteboardType: Data] = [:]
+            for type in item.types {
+                if let value = item.data(forType: type) { data[type] = value }
+            }
+            return data
+        }
+    }
+
+    private static func restorePasteboard(_ pb: NSPasteboard, _ snapshot: [[NSPasteboard.PasteboardType: Data]]) {
+        pb.clearContents()
+        guard !snapshot.isEmpty else { return }
+        let items = snapshot.map { entry -> NSPasteboardItem in
+            let item = NSPasteboardItem()
+            for (type, data) in entry { item.setData(data, forType: type) }
+            return item
+        }
+        pb.writeObjects(items)
     }
 
     // MARK: - Hotkey
@@ -174,7 +265,8 @@ enum Input {
             _ = try emitMouse(at: CGPoint(x: x, y: y), button: button, count: count,
                               activatePid: pidRaw == 0 ? nil : Int32(pidRaw))
         case "type":
-            _ = try type((op["text"] as? String) ?? "", perCharDelayMs: (op["delayMs"] as? Int) ?? 0)
+            let method = TypeMethod(rawValue: (op["method"] as? String) ?? "auto") ?? .auto
+            _ = try type((op["text"] as? String) ?? "", perCharDelayMs: (op["delayMs"] as? Int) ?? 0, method: method)
         case "hotkey":
             _ = try hotkey((op["combo"] as? String) ?? "")
         default:
