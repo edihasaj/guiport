@@ -120,6 +120,19 @@ enum PermissionApp {
         let appIcon = resources.appendingPathComponent("guiport.icns")
         let plist = contents.appendingPathComponent("Info.plist")
 
+        let lsregister = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+
+        // If guiport is already running from inside the target bundle (the
+        // packaged layout: bin/guiport -> guiport.app/Contents/MacOS/guiport),
+        // nuking the bundle would delete the running binary out from under us and
+        // the copy below would then fail. The bundle is already correct — just
+        // re-register it and return.
+        if executable.resolvingSymlinksInPath().path
+            .hasPrefix(app.resolvingSymlinksInPath().path + "/") {
+            _ = run(lsregister, ["-f", app.path])
+            return app.path
+        }
+
         do {
             // Remove any pre-existing bundle wholesale before rebuilding. A stale
             // bundle from an older version can carry a dangling `Contents/MacOS`
@@ -154,7 +167,7 @@ enum PermissionApp {
             try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: appExecutable.path)
             _ = run("/usr/bin/codesign", ["--force", "--sign", "-", "--identifier", bundleID, appExecutable.path])
             _ = run("/usr/bin/codesign", ["--force", "--sign", "-", "--identifier", bundleID, app.path])
-            _ = run("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister", ["-f", app.path])
+            _ = run(lsregister, ["-f", app.path])
             return app.path
         } catch {
             return nil
