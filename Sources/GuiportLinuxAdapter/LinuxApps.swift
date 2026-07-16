@@ -23,7 +23,7 @@ enum LinuxApps {
         if let t = titleNeedle, !t.isEmpty {
             // Re-enumerate with title info so we can match against window titles.
             if LinuxSession.current == .x11 {
-                let wins = try wmctrlWindows()
+                let wins = try x11Windows()
                 if let hit = wins.first(where: { $0.title.lowercased().contains(t) }) {
                     return AppTarget(
                         name: hit.appHint ?? "pid-\(hit.pid)",
@@ -54,21 +54,14 @@ enum LinuxApps {
 
     static func windowCount(pid: Int32) -> Int {
         guard LinuxSession.current == .x11 else { return 0 }
-        let wins = (try? wmctrlWindows()) ?? []
+        let wins = (try? x11Windows()) ?? []
         return wins.filter { $0.pid == pid }.count
     }
 
     // MARK: - X11
 
     private static func listX11(onlyWithWindows: Bool) throws -> [AppInfo] {
-        guard Shell.which("wmctrl") else {
-            throw GuiportError(
-                code: "tool_missing",
-                message: "wmctrl is required for app enumeration on X11",
-                hint: "Install: sudo apt install wmctrl  /  sudo dnf install wmctrl"
-            )
-        }
-        let wins = try wmctrlWindows()
+        let wins = try x11Windows()
         var grouped: [Int32: (name: String, count: Int)] = [:]
         for w in wins {
             let n = w.appHint ?? procName(pid: w.pid) ?? "pid-\(w.pid)"
@@ -96,6 +89,51 @@ enum LinuxApps {
         let pid: Int32
         let appHint: String?
         let title: String
+    }
+
+    /// X11 window list via wmctrl when present, else xdotool (already required
+    /// for input) — so `apps`/resolution work with just xdotool installed.
+    static func x11Windows() throws -> [WmctrlWindow] {
+        if Shell.which("wmctrl") { return try wmctrlWindows() }
+        if Shell.which("xdotool") { return try xdotoolWindows() }
+        throw GuiportError(
+            code: "tool_missing",
+            message: "need wmctrl or xdotool for app enumeration on X11",
+            hint: "Install: sudo apt install xdotool  (or wmctrl)"
+        )
+    }
+
+    /// Enumerate visible, named top-level windows via xdotool, then read each
+    /// window's pid and title.
+    static func xdotoolWindows() throws -> [WmctrlWindow] {
+        let search = Shell.env("xdotool", ["search", "--onlyvisible", "--name", ".+"])
+        let ids = search.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        // xdotool exits 1 when *no windows match* — that's an empty result, not a
+        // failure. Only treat it as an error when the X connection itself failed.
+        if search.exit != 0 && ids.isEmpty {
+            let err = search.stderr.lowercased()
+            if err.contains("display") || err.contains("connect") || err.contains("cannot open") {
+                throw GuiportError(
+                    code: "xdotool_failed",
+                    message: "xdotool search failed: \(search.stderr.trimmingCharacters(in: .whitespacesAndNewlines))",
+                    hint: "Is X11 running and DISPLAY set?"
+                )
+            }
+            return []
+        }
+        var out: [WmctrlWindow] = []
+        for id in search.stdout.split(whereSeparator: \.isNewline) {
+            let wid = String(id)
+            let pidR = Shell.env("xdotool", ["getwindowpid", wid])
+            guard pidR.exit == 0,
+                  let pid = Int32(pidR.stdout.trimmingCharacters(in: .whitespacesAndNewlines))
+            else { continue }
+            let nameR = Shell.env("xdotool", ["getwindowname", wid])
+            let title = nameR.exit == 0
+                ? nameR.stdout.trimmingCharacters(in: .whitespacesAndNewlines) : ""
+            out.append(WmctrlWindow(id: wid, pid: pid, appHint: procName(pid: pid), title: title))
+        }
+        return out
     }
 
     static func wmctrlWindows() throws -> [WmctrlWindow] {
