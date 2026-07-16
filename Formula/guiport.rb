@@ -18,7 +18,14 @@ class Guiport < Formula
 
   def install
     system "swift", "build", "--disable-sandbox", "-c", "release"
-    bin.install ".build/release/guiport"
+    # Wrap the CLI in a guiport.app and run bin/guiport from inside it, so macOS
+    # shows the real logo in the Privacy panes and keys the TCC grant to a stable
+    # identity across upgrades (issue #4). `head` builds are ad-hoc signed;
+    # tagged releases ship a Developer-ID-signed bundle from the tap.
+    system "scripts/make-app-bundle.sh",
+           "--bin", ".build/release/guiport",
+           "--out", "#{prefix}/guiport.app"
+    bin.install_symlink prefix/"guiport.app/Contents/MacOS/guiport" => "guiport"
     pkgshare.install "assets/icon.icns"
   end
 
@@ -29,8 +36,9 @@ class Guiport < Formula
         1. Accessibility   — System Settings → Privacy & Security → Accessibility
         2. Screen Recording — System Settings → Privacy & Security → Screen Recording
 
-      Run `guiport doctor --fix` first. It registers ~/Applications/guiport.app
-      so macOS shows a real `guiport` app entry in the permission lists.
+      This install ships a signed guiport.app and runs the CLI from inside it,
+      so the permission lists show guiport's real logo. Run `guiport doctor --fix`
+      to trigger both prompts, then toggle guiport ON.
 
       After granting, verify with:
 

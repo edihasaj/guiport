@@ -49,20 +49,38 @@ swift build -c release
 BIN_SRC=".build/release/guiport"
 [ -f "$BIN_SRC" ] || die "Build did not produce $BIN_SRC"
 
+install_bare=0
 if [ "$UNAME_S" = "Darwin" ]; then
-  say "Installing signed guiport.app wrapper…"
-  if scripts/install-macos-app.sh --bin "$BIN_SRC"; then
-    say "Installed app wrapper with icon for stable macOS TCC grants."
+  say "Building signed guiport.app wrapper…"
+  # Install the .app, then point bin/guiport INSIDE it so the running process is
+  # bundle-associated (real logo + stable TCC identity), instead of a bare binary.
+  app_line="$(scripts/install-macos-app.sh --bin "$BIN_SRC" 2>/dev/null | grep '^installed app: ' || true)"
+  app_path="${app_line#installed app: }"
+  app_exe="$app_path/Contents/MacOS/guiport"
+  if [ -n "$app_path" ] && [ -x "$app_exe" ]; then
+    say "Linking $BIN_DIR/guiport → $app_exe (sudo may prompt)…"
+    if [ -w "$BIN_DIR" ]; then
+      ln -sf "$app_exe" "$BIN_DIR/guiport"
+    else
+      sudo ln -sf "$app_exe" "$BIN_DIR/guiport"
+    fi
+    say "guiport runs from inside guiport.app — real logo + stable TCC identity."
   else
-    warn "Could not install guiport.app wrapper. The CLI still works, but Screen Recording may need a separate grant."
+    warn "Could not build guiport.app wrapper; installing the bare CLI instead."
+    warn "Permission panes may show a generic icon and grants may reset on updates."
+    install_bare=1
   fi
+else
+  install_bare=1
 fi
 
-say "Installing to $BIN_DIR/guiport (sudo may prompt)…"
-if [ -w "$BIN_DIR" ]; then
-  cp "$BIN_SRC" "$BIN_DIR/guiport"
-else
-  sudo cp "$BIN_SRC" "$BIN_DIR/guiport"
+if [ "$install_bare" = "1" ]; then
+  say "Installing to $BIN_DIR/guiport (sudo may prompt)…"
+  if [ -w "$BIN_DIR" ]; then
+    cp "$BIN_SRC" "$BIN_DIR/guiport"
+  else
+    sudo cp "$BIN_SRC" "$BIN_DIR/guiport"
+  fi
 fi
 
 say "Cleaning up $WORK_DIR"

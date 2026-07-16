@@ -150,32 +150,29 @@ jobs:
           echo "signed=true" >> "$GITHUB_OUTPUT"
           rm -f "$RUNNER_TEMP/cert.p12"
 
-      - name: Codesign binary (Developer ID, hardened runtime)
-        if: steps.cert.outputs.signed == 'true'
+      # Wrap the universal binary in a guiport.app and sign the BUNDLE (not the
+      # bare binary). Homebrew runs bin/guiport from inside this bundle, so macOS
+      # shows guiport's real logo in the Privacy panes and — with a Developer ID
+      # identity — keys the TCC grant to a stable subject that survives upgrades.
+      # Falls back to ad-hoc (stable identifier, grouped entries) when unsigned.
+      - name: Assemble + sign guiport.app
+        id: bundle
         env:
+          NEXT: ${{ needs.bump.outputs.next }}
+          SIGNED: ${{ steps.cert.outputs.signed }}
           IDENTITY: ${{ steps.cert.outputs.identity }}
         run: |
           set -euo pipefail
           bindir=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)
-          codesign --force --options runtime --timestamp \
-            --sign "$IDENTITY" \
-            --identifier com.edihasaj.guiport \
-            "$bindir/guiport"
-          codesign --verify --strict --verbose=2 "$bindir/guiport"
-          codesign -dv --verbose=4 "$bindir/guiport" 2>&1 | grep -E 'Identifier|TeamIdentifier'
-
-      # No Developer-ID cert: still ad-hoc sign with the STABLE bundle identifier
-      # (matching the embedded Info.plist + guiport.app) so macOS groups guiport's
-      # TCC entries under one identity — consistent name + icon everywhere —
-      # instead of the bare "guiport" ad-hoc default. (cdhash still changes each
-      # build, so grants reset on upgrade until the Developer-ID secret is added.)
-      - name: Ad-hoc sign with stable bundle identifier
-        if: steps.cert.outputs.signed != 'true'
-        run: |
-          set -euo pipefail
-          bindir=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)
-          codesign --force --sign - --identifier com.edihasaj.guiport "$bindir/guiport"
-          codesign -dv "$bindir/guiport" 2>&1 | grep -E 'Identifier'
+          mkdir -p dist
+          identity="-"
+          [ "${SIGNED:-}" = "true" ] && identity="$IDENTITY"
+          scripts/make-app-bundle.sh \
+            --bin "$bindir/guiport" \
+            --out dist/guiport.app \
+            --version "$NEXT" \
+            --identity "$identity"
+          codesign -dv --verbose=4 dist/guiport.app 2>&1 | grep -E 'Identifier|TeamIdentifier' || true
 
       - name: Package tarball
         id: pkg
@@ -183,16 +180,15 @@ jobs:
           NEXT: ${{ needs.bump.outputs.next }}
         run: |
           set -euo pipefail
-          # Universal builds land under .build/apple/Products/Release, NOT the
-          # single-arch .build/release symlink — resolve it from SwiftPM.
-          bindir=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)
           name="guiport-${NEXT}-macos-universal.tar.gz"
-          tar -C "$bindir" -czf "$name" guiport
+          # COPYFILE_DISABLE keeps AppleDouble (._*) files out of the archive so
+          # the unpacked bundle stays a clean, still-signed guiport.app.
+          COPYFILE_DISABLE=1 tar -C dist -czf "$name" guiport.app
           sha=$(shasum -a 256 "$name" | awk '{print $1}')
           echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          # Sanity: the built binary must report the version we just tagged.
-          got=$("$bindir/guiport" --version | tr -d '[:space:]')
+          # Sanity: the bundled binary must report the version we just tagged.
+          got=$(dist/guiport.app/Contents/MacOS/guiport --version | tr -d '[:space:]')
           [ "$got" = "$NEXT" ] || { echo "version mismatch: binary=$got tag=$NEXT"; exit 1; }
 
       - name: Publish GitHub release
@@ -229,6 +225,12 @@ jobs:
             -e "s#^  version \".*\"#  version \"${NEXT}\"#" \
             -e "s#assert_match \"[^\"]*\", shell_output#assert_match \"${NEXT}\", shell_output#" \
             "$f"
+          # The tarball now ships guiport.app (not a bare binary): install the
+          # bundle and symlink bin/guiport into it so the running process is
+          # bundle-associated (real logo + stable TCC identity). Targets the old
+          # `bin.install "guiport"` line; a no-op once the tap already carries the
+          # bundle install, so repeated releases stay correct.
+          /usr/bin/perl -0pi -e 's/  def install\n    bin\.install "guiport"\n  end/  def install\n    # Ship + run from the signed guiport.app so macOS shows the real logo in\n    # the Privacy panes and the TCC grant survives upgrades (guiport issue #4).\n    prefix.install "guiport.app"\n    bin.install_symlink prefix\/"guiport.app\/Contents\/MacOS\/guiport" => "guiport"\n  end/' "$f"
           cd tap
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
