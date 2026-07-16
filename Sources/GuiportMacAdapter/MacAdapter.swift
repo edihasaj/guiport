@@ -54,6 +54,14 @@ public struct MacAdapter: DesktopAdapter {
 
     public func windowCount(pid: Int32) -> Int { AXBridge.windowCount(pid: pid) }
 
+    // MARK: - Activation / focus
+
+    public func activate(target: AppTarget) throws -> ActivationResult {
+        try Activation.activate(target: target)
+    }
+
+    public func frontmostApp() -> AppInfo? { Activation.frontmostApp() }
+
     // MARK: - AX inspection
 
     public func observe(target: AppTarget) throws -> AXSummary {

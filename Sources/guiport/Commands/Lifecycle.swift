@@ -70,31 +70,6 @@ enum Lifecycle {
         #endif
     }
 
-    static func activate(app: String, timeout: Double) throws -> LifecycleCommand.ActivateResult {
-        #if os(macOS)
-        guard let running = findRunning(matching: app).first else {
-            throw GuiportError(code: "not_running",
-                               message: "'\(app)' is not running — launch it first",
-                               hint: "guiport lifecycle launch --app \(app)")
-        }
-        // Bring it to the front without relaunching or synthesizing a click.
-        running.activate(options: [.activateAllWindows])
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if NSWorkspace.shared.frontmostApplication?.processIdentifier == running.processIdentifier {
-                break
-            }
-            Thread.sleep(forTimeInterval: 0.1)
-        }
-        let frontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier == running.processIdentifier
-        return LifecycleCommand.ActivateResult(
-            app: app, pid: running.processIdentifier,
-            bundleId: running.bundleIdentifier, frontmost: frontmost)
-        #else
-        throw GuiportError(code: "unsupported", message: "lifecycle activate is only implemented on macOS")
-        #endif
-    }
-
     static func quit(app: String, force: Bool, timeout: Double) throws -> LifecycleCommand.QuitResult {
         #if os(macOS)
         let running = findRunning(matching: app)

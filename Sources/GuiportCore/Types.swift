@@ -127,6 +127,58 @@ public struct InputResult: Encodable, Sendable {
     }
 }
 
+/// Outcome of foregrounding an app via `activate` (no relaunch, no click).
+public struct ActivationResult: Encodable, Sendable {
+    public let action: String
+    public let app: String
+    public let pid: Int32
+    public let bundleId: String?
+    /// True if the app was already frontmost when `activate` was called.
+    public let alreadyFrontmost: Bool
+    /// True if the raise call was issued (i.e. it wasn't already frontmost).
+    public let activated: Bool
+    /// True if the app is frontmost after the call settled.
+    public let frontmost: Bool
+
+    public init(app: String, pid: Int32, bundleId: String?,
+                alreadyFrontmost: Bool, activated: Bool, frontmost: Bool) {
+        self.action = "activate"
+        self.app = app
+        self.pid = pid
+        self.bundleId = bundleId
+        self.alreadyFrontmost = alreadyFrontmost
+        self.activated = activated
+        self.frontmost = frontmost
+    }
+}
+
+/// One named check inside an `assert` run.
+public struct AssertCheck: Encodable, Sendable {
+    public let name: String
+    public let passed: Bool
+    public let detail: String?
+
+    public init(name: String, passed: Bool, detail: String?) {
+        self.name = name; self.passed = passed; self.detail = detail
+    }
+}
+
+/// Aggregate result of an `assert` run. `passed` is the AND of every check;
+/// the command exits nonzero when it's false.
+public struct AssertResult: Encodable, Sendable {
+    public let action: String
+    public let app: String?
+    public let passed: Bool
+    public let checks: [AssertCheck]
+
+    public init(app: String?, checks: [AssertCheck]) {
+        self.action = "assert"
+        self.app = app
+        self.checks = checks
+        self.passed = checks.allSatisfy { $0.passed }
+    }
+}
+
 public struct ScreenshotResult: Encodable, Sendable {
     public let path: String
     public let width: Int

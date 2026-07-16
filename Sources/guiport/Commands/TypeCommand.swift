@@ -13,6 +13,8 @@ struct TypeCommand: AsyncParsableCommand {
 
     @OptionGroup var output: OutputOption
 
+    @OptionGroup var guardFrontmost: FrontmostGuard
+
     @Option(name: .long, help: "Per-character delay in milliseconds (keystroke method).")
     var delayMs: Int = 0
 
@@ -23,6 +25,7 @@ struct TypeCommand: AsyncParsableCommand {
     var text: String
 
     func run() async throws {
+        try guardFrontmost.enforce()
         let result = try Adapter.current.type(text: text, perCharDelayMs: delayMs, method: method)
         try JSONOutput.print(result, pretty: output.pretty)
     }

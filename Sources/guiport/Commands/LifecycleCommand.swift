@@ -10,7 +10,7 @@ import AppKit
 struct LifecycleCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "lifecycle",
-        abstract: "Launch, quit, kill, or restart an app.",
+        abstract: "Launch, quit, kill, restart, or activate an app.",
         subcommands: [Launch.self, Activate.self, Quit.self, Kill.self, Restart.self]
     )
 
@@ -35,14 +35,6 @@ struct LifecycleCommand: AsyncParsableCommand {
         let app: String
         let pids: [Int32]
         let stopped: Bool
-    }
-
-    struct ActivateResult: Encodable {
-        let action = "activate"
-        let app: String
-        let pid: Int32?
-        let bundleId: String?
-        let frontmost: Bool
     }
 
     // MARK: - launch
@@ -72,7 +64,10 @@ struct LifecycleCommand: AsyncParsableCommand {
         @OptionGroup var output: OutputOption
 
         func run() async throws {
-            let r = try Lifecycle.activate(app: common.app, timeout: common.timeout)
+            // Delegates to the shared engine path so `lifecycle activate` and the
+            // top-level `activate` verb behave identically (same ActivationResult,
+            // same `app_not_found` when the target isn't running).
+            let r = try ActivateCommand.activate(app: common.app)
             try JSONOutput.print(r, pretty: output.pretty)
         }
     }
