@@ -11,7 +11,7 @@ struct LifecycleCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "lifecycle",
         abstract: "Launch, quit, kill, or restart an app.",
-        subcommands: [Launch.self, Quit.self, Kill.self, Restart.self]
+        subcommands: [Launch.self, Activate.self, Quit.self, Kill.self, Restart.self]
     )
 
     struct Common: ParsableArguments {
@@ -28,6 +28,17 @@ struct LifecycleCommand: AsyncParsableCommand {
         let pid: Int32?
         let bundleId: String?
         let launched: Bool
+    }
+
+    struct ActivateResult: Encodable {
+        let action = "activate"
+        let app: String
+        let pid: Int32
+        let bundleId: String?
+        /// True when the app is frontmost after the call (the verifiable outcome).
+        let active: Bool
+        /// True when it was already frontmost, so no activation was needed.
+        let alreadyFrontmost: Bool
     }
 
     struct QuitResult: Encodable {
@@ -49,6 +60,22 @@ struct LifecycleCommand: AsyncParsableCommand {
 
         func run() async throws {
             let r = try Lifecycle.launch(app: common.app, timeout: common.timeout)
+            try JSONOutput.print(r, pretty: output.pretty)
+        }
+    }
+
+    // MARK: - activate (foreground without relaunch)
+
+    struct Activate: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "activate",
+            abstract: "Foreground a running app without relaunching or clicking."
+        )
+        @OptionGroup var common: Common
+        @OptionGroup var output: OutputOption
+
+        func run() async throws {
+            let r = try Lifecycle.activate(app: common.app, timeout: common.timeout)
             try JSONOutput.print(r, pretty: output.pretty)
         }
     }

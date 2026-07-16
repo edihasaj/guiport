@@ -66,6 +66,42 @@ enum Lifecycle {
         #endif
     }
 
+    /// Bring an already-running app to the foreground without relaunching it
+    /// and without a synthetic click. No-op-safe when the app is already
+    /// frontmost; a clear error when it isn't running at all.
+    static func activate(app: String, timeout: Double) throws -> LifecycleCommand.ActivateResult {
+        #if os(macOS)
+        guard let target = findRunning(matching: app).first else {
+            throw GuiportError(code: "app_not_found",
+                               message: "no running app matches '\(app)'",
+                               hint: "use `guiport apps` to list running apps, or `guiport lifecycle launch` to start it")
+        }
+
+        let pid = target.processIdentifier
+        let alreadyFrontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier == pid
+        if !alreadyFrontmost {
+            target.activate(options: [])
+            // Activation is async; poll until the app is frontmost or we run out of time.
+            let deadline = Date().addingTimeInterval(timeout)
+            while Date() < deadline {
+                if NSWorkspace.shared.frontmostApplication?.processIdentifier == pid { break }
+                Thread.sleep(forTimeInterval: 0.05)
+            }
+        }
+
+        let active = NSWorkspace.shared.frontmostApplication?.processIdentifier == pid
+        return LifecycleCommand.ActivateResult(
+            app: app,
+            pid: pid,
+            bundleId: target.bundleIdentifier,
+            active: active,
+            alreadyFrontmost: alreadyFrontmost
+        )
+        #else
+        throw GuiportError(code: "unsupported", message: "lifecycle activate is only implemented on macOS")
+        #endif
+    }
+
     static func quit(app: String, force: Bool, timeout: Double) throws -> LifecycleCommand.QuitResult {
         #if os(macOS)
         let running = findRunning(matching: app)

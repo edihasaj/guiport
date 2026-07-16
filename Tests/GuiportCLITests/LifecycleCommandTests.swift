@@ -7,7 +7,7 @@ final class LifecycleCommandTests: XCTestCase {
     func testHelpListsAllSubcommands() throws {
         let out = try CLI.run(["lifecycle", "--help"])
         XCTAssertEqual(out.code, 0)
-        for verb in ["launch", "quit", "kill", "restart"] {
+        for verb in ["launch", "activate", "quit", "kill", "restart"] {
             XCTAssertTrue(out.stdout.contains(verb),
                           "expected `\(verb)` in lifecycle --help, got:\n\(out.stdout)")
         }
@@ -25,6 +25,26 @@ final class LifecycleCommandTests: XCTestCase {
         XCTAssertNotEqual(out.code, 0)
         XCTAssertTrue(out.stderr.contains("app_not_found") || out.stderr.contains("launch_failed"),
                       "expected app_not_found / launch_failed error, got:\n\(out.stderr)")
+    }
+
+    func testActivateRejectsMissingApp() throws {
+        let out = try CLI.run(["lifecycle", "activate"])
+        XCTAssertNotEqual(out.code, 0, "missing --app must fail")
+        XCTAssertTrue(out.stderr.lowercased().contains("--app"),
+                      "expected usage to mention --app, got:\n\(out.stderr)")
+    }
+
+    func testActivateUnknownAppReturnsAppNotFound() throws {
+        // activate never launches, so an absent app is a hard error (unlike quit,
+        // which is idempotent). Callers must know the app isn't there to raise.
+        let out = try CLI.run([
+            "lifecycle", "activate",
+            "--app", "com.example.notrunning.\(UUID().uuidString)",
+            "--timeout", "1",
+        ])
+        XCTAssertNotEqual(out.code, 0)
+        XCTAssertTrue(out.stderr.contains("app_not_found"),
+                      "expected app_not_found error, got:\n\(out.stderr)")
     }
 
     func testQuitOnNonRunningAppIsIdempotent() throws {

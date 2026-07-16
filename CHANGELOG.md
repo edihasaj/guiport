@@ -15,6 +15,15 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
   stable-identifier ad-hoc signature.
 
 ### Added
+- `guiport lifecycle activate --app <app>` — foreground an already-running app
+  without relaunching it and without a synthetic click (which moves the mouse
+  and can hit content). Fills the "make app X frontmost before `hotkey`/`type`"
+  gap so keystrokes land in the right app. No-op-safe when the app is already
+  frontmost (`alreadyFrontmost: true`); a clear `app_not_found` error when it
+  isn't running. Returns the resulting frontmost state (`active`) so callers can
+  verify — pairs with the `apps --json` `active` flag. macOS uses
+  `NSRunningApplication.activate`; Windows (`SetForegroundWindow`) and Linux (WM
+  raise) land behind the same verb later.
 - `guiport doctor --fix` now self-registers `~/Applications/guiport.app` from
   the active binary before firing TCC prompts, so Accessibility and Screen
   Recording panes show a real `guiport` app entry even for Homebrew CLI installs.
