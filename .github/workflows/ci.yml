@@ -41,7 +41,7 @@ jobs:
         run: .build/release/guiport --help
 
   build-windows:
-    name: build (Windows)
+    name: build + test (Windows)
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
@@ -65,12 +65,20 @@ jobs:
         shell: pwsh
         run: swift build -c release
 
+      # The CLI integration tests (GuiportCLITests) assert macOS lifecycle
+      # semantics, so we run only the platform-agnostic unit tests here. The
+      # filter still compiles every target — including all adapters — so a
+      # Windows build break in the CLI test target would still fail CI.
+      - name: Test (platform-agnostic unit tests)
+        shell: pwsh
+        run: swift test --filter GuiportCoreTests
+
       - name: Verify CLI loads
         shell: pwsh
         run: .build\release\guiport.exe --help
 
   build-linux:
-    name: build (Linux)
+    name: build + test (Linux)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -94,6 +102,13 @@ jobs:
 
       - name: Build
         run: swift build -c release
+
+      # CLI integration tests assert macOS lifecycle semantics; run only the
+      # platform-agnostic unit tests here. The filter still compiles every
+      # target (all adapters + the CLI test target), so a Linux build break
+      # would still fail CI.
+      - name: Test (platform-agnostic unit tests)
+        run: swift test --filter GuiportCoreTests
 
       - name: Verify CLI loads
         run: .build/release/guiport --help

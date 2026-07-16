@@ -4,6 +4,17 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Added
+- **Cross-platform CI now builds _and_ tests all three platforms.** The Windows
+  and Linux jobs run the platform-agnostic unit tests (`swift test --filter
+  GuiportCoreTests`) after building — the filter still compiles every target
+  (all adapters + the CLI test target), so a Windows/Linux build break in any
+  target fails CI. macOS keeps the full suite. Closes #3.
+- **Per-platform support matrix in the README** documenting which verbs work on
+  macOS / Windows / Linux and the labeled error each pending verb throws
+  (`uia_pending`, `atspi_pending`, `ocr_pending`, `recorder_pending`,
+  `unsupported`).
+
 ### Changed
 - **Homebrew now ships a signed `guiport.app` and runs the CLI from inside it.**
   The release wraps the universal binary in a Developer-ID-signed `guiport.app`
@@ -16,6 +27,9 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
   is centralised in `scripts/make-app-bundle.sh`, shared by the release workflow
   and the local/install-script path (which now symlinks into the app too).
   Closes #4.
+- `lifecycle launch` / `lifecycle quit` now return an actionable `hint`
+  pointing at the roadmap when invoked on Windows/Linux, instead of a bare
+  `unsupported` error.
 - Release binaries are now signed with the team **Developer ID Application**
   certificate (Applifyer, LLC — team `T8J48M4QVY`) instead of ad-hoc. This gives
   guiport a stable certificate-based designated requirement, so macOS keeps

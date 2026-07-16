@@ -20,11 +20,40 @@ A fast CLI/MCP control layer that lets agents like Claude, Codex, opencode, and 
 
 Available on macOS, Windows, and Linux. macOS is the primary target and runs the full stack — Accessibility tree first, screenshots as fallback.
 
-Windows ships a standalone binary (bundled Swift runtime, no toolchain needed) with input/screenshot/apps (Win32 SendInput, GDI BitBlt/PrintWindow → real PNG, EnumWindows). UIA-backed tree/observe/find/click-by-selector and WinRT OCR are pending — they throw a clear `uia_pending` / `ocr_pending` error today. Track progress under the [`windows`](https://github.com/edihasaj/guiport/issues?q=label%3Awindows) label.
+Windows ships a standalone binary (bundled Swift runtime, no toolchain needed) with input/screenshot/apps (Win32 SendInput, GDI BitBlt/PrintWindow → real PNG, EnumWindows) and `find-text` / `click-text` via WinRT OCR. UIA-backed tree/observe/find/click-by-selector is pending — it throws a clear `uia_pending` error today. Track progress under the [`windows`](https://github.com/edihasaj/guiport/issues?q=label%3Awindows) label.
 
 Linux ships a standalone binary (static Swift stdlib, glibc 2.35+) with the same shape: shell-out to `xdotool`/`wmctrl`/`scrot` on X11 and `ydotool`/`grim` on Wayland for input + screenshot, `/proc` + `wmctrl` for app enumeration. AT-SPI2-backed tree/observe/find and tesseract OCR throw `atspi_pending` / `ocr_pending` until those bindings land. Track under [`linux`](https://github.com/edihasaj/guiport/issues?q=label%3Alinux).
 
 Prebuilt binaries for all three platforms are attached to every [release](https://github.com/edihasaj/guiport/releases/latest).
+
+### Support matrix
+
+Which verbs work on each platform today. Pending verbs don't crash — they exit
+non-zero with a labeled, actionable error (the code is in the table), so agents
+can branch on it. CI builds all three platforms and runs the platform-agnostic
+unit tests on each.
+
+| Verb / capability | macOS | Windows | Linux |
+| --- | :---: | :---: | :---: |
+| `apps` (list / resolve) | ✅ | ✅ | ✅¹ |
+| `click-at` | ✅ | ✅ | ✅ |
+| `type` | ✅ | ✅ | ✅ |
+| `hotkey` | ✅ | ✅ | ✅ |
+| `screenshot` (full screen) | ✅ | ✅² | ✅ |
+| `screenshot` (single window) | ✅ | ✅² | ✅ X11 · ⏳ Wayland |
+| `observe` / `tree` / `find` / `click` (by selector) | ✅ | ⏳ `uia_pending` | ⏳ `atspi_pending` |
+| `find-text` / `click-text` (OCR) | ✅ | ✅³ | ⏳ `ocr_pending` |
+| `record` | ✅ | ⏳ `recorder_pending` | ⏳ `recorder_pending` |
+| `lifecycle` (launch / quit / kill / restart) | ✅ | ⏳ `unsupported` | ⏳ `unsupported` |
+
+✅ implemented · ⏳ pending (throws a clear, labeled error)
+
+¹ X11 gives full window counts via `wmctrl`; on Wayland `apps` falls back to a
+`/proc` walk with no per-window data.
+² Windows currently writes the capture as a 32-bpp BMP (a `.png` path is
+rewritten to `.bmp`); PNG encoding via WIC is the follow-up.
+³ Windows `find-text` / `click-text` are backed by WinRT OCR
+(`Windows.Media.Ocr`).
 
 ## Why
 
@@ -164,7 +193,7 @@ background process lands on screen.
 
 ## Non-goals (MVP)
 
-- No full a11y-tree selectors on Windows/Linux yet (UIA / AT-SPI2 pending; input, screenshot, and app control ship today).
+- No accessibility tree (UIA / AT-SPI2) on Windows/Linux yet — see the [support matrix](#support-matrix).
 - No vision-first automation.
 - No autonomous Manus clone.
 - No background/session-0 automation.
