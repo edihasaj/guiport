@@ -49,9 +49,11 @@ enum WinOCR {
             var r = RECT()
             GetWindowRect(hwnd, &r)
             _ = try WinScreenshot.capture(target: target, to: path)
+            try requireFile(path)
             return (Int(r.left), Int(r.top))
         }
         _ = try WinScreenshot.capture(target: nil, to: path)
+        try requireFile(path)
         // Virtual-desktop capture starts at (SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN).
         return (Int(GetSystemMetrics(SM_XVIRTUALSCREEN)), Int(GetSystemMetrics(SM_YVIRTUALSCREEN)))
     }
@@ -61,24 +63,30 @@ enum WinOCR {
         try OCR_BOXES_PS1.write(toFile: scriptPath, atomically: true, encoding: .utf8)
         defer { try? FileManager.default.removeItem(atPath: scriptPath) }
 
+        // WinRT StorageFile.GetFileFromPathAsync demands a fully-qualified path
+        // with BACKSLASHES — a forward-slash path (what Swift URL.path yields)
+        // makes it silently return no text. Normalise both paths.
+        let png = pngPath.replacingOccurrences(of: "/", with: "\\")
+        let script = scriptPath.replacingOccurrences(of: "/", with: "\\")
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: powershellPath())
-        proc.arguments = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath, "-Path", pngPath]
+        proc.arguments = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-Path", png]
         let outPipe = Pipe()
+        let errPipe = Pipe()
         proc.standardOutput = outPipe
-        proc.standardError = Pipe()
+        proc.standardError = errPipe
         do {
             try proc.run()
         } catch {
             throw GuiportError(code: "ocr_failed", message: "could not launch PowerShell for OCR: \(error)")
         }
         proc.waitUntilExit()
-        let data = outPipe.fileHandleForReading.readDataToEndOfFile()
-        let out = String(data: data, encoding: .utf8) ?? ""
+        let out = String(data: outPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let errText = String(data: errPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
         if proc.terminationStatus != 0 {
             throw GuiportError(
                 code: "ocr_failed",
-                message: "WinRT OCR failed (exit \(proc.terminationStatus))",
+                message: "WinRT OCR failed (exit \(proc.terminationStatus)): \(errText.trimmingCharacters(in: .whitespacesAndNewlines))",
                 hint: "Ensure an OCR language pack is installed (Settings → Time & Language → Language)."
             )
         }
@@ -95,15 +103,23 @@ enum WinOCR {
         return lines
     }
 
+    private static func requireFile(_ path: String) throws {
+        if !FileManager.default.fileExists(atPath: path) {
+            throw GuiportError(code: "ocr_capture", message: "screen capture produced no file at \(path)")
+        }
+    }
+
     private static func powershellPath() -> String {
         let sys = ProcessInfo.processInfo.environment["SystemRoot"] ?? "C:\\Windows"
         return "\(sys)\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
     }
 
     private static func tempFile(ext: String) -> String {
-        FileManager.default.temporaryDirectory
-            .appendingPathComponent("guiport-ocr-\(UUID().uuidString).\(ext)")
-            .path
+        // Native backslash path (not URL.path, which yields forward slashes that
+        // trip WinRT's StorageFile path parsing).
+        let env = ProcessInfo.processInfo.environment
+        let tmp = env["TEMP"] ?? env["TMP"] ?? "C:\\Windows\\Temp"
+        return "\(tmp)\\guiport-ocr-\(UUID().uuidString).\(ext)"
     }
 }
 
