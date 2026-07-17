@@ -260,12 +260,38 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NEXT: ${{ needs.bump.outputs.next }}
         run: |
+          $ErrorActionPreference = "Stop"
           $bin = & swift build -c release --show-bin-path
           $exe = Join-Path $bin "guiport.exe"
           $got = (& $exe --version).Trim()
           if ($got -ne $env:NEXT) { throw "version mismatch: binary=$got tag=$env:NEXT" }
+
+          # A `swift build` exe dynamically links the Swift Windows runtime
+          # (swiftCore.dll, Foundation.dll, ICU, dispatch, ...). Bundle those
+          # DLLs so guiport runs on a machine without the toolchain installed.
+          $stage = Join-Path $env:RUNNER_TEMP "guiport-win"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item $exe $stage
+
+          $rtDir = Split-Path (Get-Command swiftCore.dll -ErrorAction SilentlyContinue).Source
+          if (-not $rtDir) {
+            $found = where.exe swiftCore.dll 2>$null | Select-Object -First 1
+            if ($found) { $rtDir = Split-Path $found }
+          }
+          if (-not $rtDir) { throw "could not locate Swift runtime DLLs (swiftCore.dll not on PATH)" }
+          Write-Host "Swift runtime dir: $rtDir"
+
+          $patterns = @("swift*.dll","Foundation*.dll","_Foundation*.dll","dispatch.dll","BlocksRuntime.dll","icu*.dll")
+          foreach ($pat in $patterns) {
+            Get-ChildItem -Path (Join-Path $rtDir $pat) -ErrorAction SilentlyContinue |
+              ForEach-Object { Copy-Item $_.FullName $stage -Force }
+          }
+          $dllCount = (Get-ChildItem (Join-Path $stage "*.dll")).Count
+          Write-Host "bundled $dllCount runtime DLLs"
+          if ($dllCount -lt 3) { throw "too few runtime DLLs bundled ($dllCount); packaging would not run" }
+
           $zip = "guiport-$env:NEXT-windows-x64.zip"
-          Compress-Archive -Path $exe -DestinationPath $zip -Force
+          Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zip -Force
           gh release upload "v$env:NEXT" $zip --repo $env:GITHUB_REPOSITORY --clobber
 
   # Attach a native Linux (x86_64) binary to the same release.
