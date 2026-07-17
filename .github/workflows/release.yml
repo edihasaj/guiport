@@ -308,15 +308,18 @@ jobs:
         uses: SwiftyLab/setup-swift@latest
         with:
           swift-version: "5.10"
-      - name: Build release binary
-        run: swift build -c release
+      # Statically link the Swift stdlib so the binary runs on a box without the
+      # Swift runtime installed (a bare build needs libswiftCore.so). System libs
+      # (glibc, X11, at-spi) are still expected present, as usual for Linux CLIs.
+      - name: Build release binary (static stdlib)
+        run: swift build -c release --static-swift-stdlib
       - name: Package + upload
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NEXT: ${{ needs.bump.outputs.next }}
         run: |
           set -euo pipefail
-          bindir=$(swift build -c release --show-bin-path)
+          bindir=$(swift build -c release --static-swift-stdlib --show-bin-path)
           got=$("$bindir/guiport" --version | tr -d '[:space:]')
           [ "$got" = "$NEXT" ] || { echo "version mismatch: binary=$got tag=$NEXT"; exit 1; }
           name="guiport-${NEXT}-linux-x86_64.tar.gz"
