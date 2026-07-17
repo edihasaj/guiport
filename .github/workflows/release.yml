@@ -294,10 +294,12 @@ jobs:
           Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zip -Force
           gh release upload "v$env:NEXT" $zip --repo $env:GITHUB_REPOSITORY --clobber
 
-  # Attach a native Linux (x86_64) binary to the same release.
+  # Attach a native Linux (x86_64) binary to the same release. Built on 22.04 for
+  # a lower glibc floor (2.35) so the binary also runs on 22.04 / Debian 12, not
+  # just glibc-2.38+ distros like 24.04.
   linux:
     needs: [bump, release]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     permissions:
       contents: write
     steps:
