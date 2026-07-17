@@ -98,10 +98,8 @@ enum WinScreenshot {
 
     // MARK: - PNG encode
 
-    /// Write a 24-bit BGR DIB to disk as PNG. We use BMP-on-disk via CreateDIBSection
-    /// + a stb_image-style minimal PNG would bloat this file; instead we write a
-    /// 32bpp BMP and let consumers transcode. PNG via WIC is the upgrade path —
-    /// tracked under the `windows` label.
+    /// Read the DIB into a 32bpp BGRA top-down buffer and write a real PNG at the
+    /// exact `path` the caller asked for (matching the reported ScreenshotResult).
     private static func writePng(bitmap: HBITMAP, dc: HDC, width: Int, height: Int, to path: String) throws {
         var bmi = BITMAPINFO()
         bmi.bmiHeader.biSize = DWORD(MemoryLayout<BITMAPINFOHEADER>.size)
@@ -118,49 +116,11 @@ enum WinScreenshot {
         if got == 0 {
             throw GuiportError(code: "getdibits_failed", message: "GetDIBits returned 0")
         }
-        // Write a 32bpp BMP (BGRA top-down). Simple, dependency-free, viewable everywhere.
-        // The CLI advertises `.png` by convention; if the user passes a `.bmp` extension
-        // they get exactly what's on disk. PNG encoding via WIC is a follow-up.
-        let actualPath = path.hasSuffix(".png") ? path.replacingOccurrences(of: ".png", with: ".bmp") : path
-        try writeBMP(pixels: pixels, width: width, height: height, to: actualPath)
-        // Ensure the folder exists.
-    }
-
-    private static func writeBMP(pixels: [UInt8], width: Int, height: Int, to path: String) throws {
-        let stride = width * 4
-        let pixelSize = stride * height
-        let fileSize = 14 + 40 + pixelSize
-        var data = Data(capacity: fileSize)
-        // BITMAPFILEHEADER
-        data.append(contentsOf: [0x42, 0x4D])                          // 'BM'
-        data.append(contentsOf: le32(UInt32(fileSize)))
-        data.append(contentsOf: le32(0))
-        data.append(contentsOf: le32(54))                              // pixel offset
-        // BITMAPINFOHEADER
-        data.append(contentsOf: le32(40))                              // size
-        data.append(contentsOf: le32(UInt32(width)))
-        data.append(contentsOf: le32(UInt32(bitPattern: Int32(-Int32(height))))) // negative = top-down
-        data.append(contentsOf: le16(1))                               // planes
-        data.append(contentsOf: le16(32))                              // bpp
-        data.append(contentsOf: le32(0))                               // BI_RGB
-        data.append(contentsOf: le32(UInt32(pixelSize)))
-        data.append(contentsOf: le32(2835))                            // 72 DPI
-        data.append(contentsOf: le32(2835))
-        data.append(contentsOf: le32(0))
-        data.append(contentsOf: le32(0))
-        data.append(contentsOf: pixels)
-        // mkdir -p
+        let png = WinPng.encode(bgra: pixels, width: width, height: height)
         let url = URL(fileURLWithPath: path)
         let dir = url.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        try data.write(to: url)
-    }
-
-    private static func le16(_ v: UInt16) -> [UInt8] {
-        [UInt8(v & 0xFF), UInt8((v >> 8) & 0xFF)]
-    }
-    private static func le32(_ v: UInt32) -> [UInt8] {
-        [UInt8(v & 0xFF), UInt8((v >> 8) & 0xFF), UInt8((v >> 16) & 0xFF), UInt8((v >> 24) & 0xFF)]
+        try png.write(to: url)
     }
 }
 
