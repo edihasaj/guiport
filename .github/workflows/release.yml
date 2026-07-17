@@ -235,3 +235,64 @@ jobs:
           git add Formula/guiport.rb
           git commit -m "guiport ${NEXT}"
           git push origin HEAD:main
+
+  # Attach a native Windows binary to the same release. Uses the same toolchain
+  # as CI's build-windows job (which already passes), so this only adds
+  # packaging + upload. Runs after `release` so the GitHub release exists.
+  windows:
+    needs: [bump, release]
+    runs-on: windows-2022
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "v${{ needs.bump.outputs.next }}"
+      - name: Setup Swift
+        uses: SwiftyLab/setup-swift@latest
+        with:
+          swift-version: "6.2.0"
+      - name: Build release binary
+        run: swift build -c release
+      - name: Package + upload
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEXT: ${{ needs.bump.outputs.next }}
+        run: |
+          $bin = & swift build -c release --show-bin-path
+          $exe = Join-Path $bin "guiport.exe"
+          $got = (& $exe --version).Trim()
+          if ($got -ne $env:NEXT) { throw "version mismatch: binary=$got tag=$env:NEXT" }
+          $zip = "guiport-$env:NEXT-windows-x64.zip"
+          Compress-Archive -Path $exe -DestinationPath $zip -Force
+          gh release upload "v$env:NEXT" $zip --repo $env:GITHUB_REPOSITORY --clobber
+
+  # Attach a native Linux (x86_64) binary to the same release.
+  linux:
+    needs: [bump, release]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "v${{ needs.bump.outputs.next }}"
+      - name: Setup Swift
+        uses: SwiftyLab/setup-swift@latest
+        with:
+          swift-version: "5.10"
+      - name: Build release binary
+        run: swift build -c release
+      - name: Package + upload
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEXT: ${{ needs.bump.outputs.next }}
+        run: |
+          set -euo pipefail
+          bindir=$(swift build -c release --show-bin-path)
+          got=$("$bindir/guiport" --version | tr -d '[:space:]')
+          [ "$got" = "$NEXT" ] || { echo "version mismatch: binary=$got tag=$NEXT"; exit 1; }
+          name="guiport-${NEXT}-linux-x86_64.tar.gz"
+          tar -C "$bindir" -czf "$name" guiport
+          gh release upload "v${NEXT}" "$name" --repo "$GITHUB_REPOSITORY" --clobber
