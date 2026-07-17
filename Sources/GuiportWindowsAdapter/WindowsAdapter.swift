@@ -80,12 +80,9 @@ public struct WindowsAdapter: DesktopAdapter {
     }
 
     public func findText(in target: AppTarget?, query: String, exact: Bool, limit: Int) throws -> [OCRMatch] {
-        // Windows.Media.Ocr (WinRT) is the natural backend; needs Swift/WinRT.
-        throw GuiportError(
-            code: "ocr_pending",
-            message: "find-text is not yet implemented on Windows",
-            hint: "Tracked under the `windows` label — Windows.Media.Ocr backend pending."
-        )
+        // Built-in Windows.Media.Ocr (WinRT) via WinOCR — backs find-text and,
+        // through it, click-text. No install needed (OCR engine ships with Windows).
+        try WinOCR.findText(in: target, query: query, exact: exact, limit: limit)
     }
 
     // MARK: - Recorder

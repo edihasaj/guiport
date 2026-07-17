@@ -89,7 +89,7 @@ enum WinScreenshot {
 
     // MARK: - HWND lookup
 
-    private static func topLevelHwnd(forPid pid: DWORD) -> HWND? {
+    static func topLevelHwnd(forPid pid: DWORD) -> HWND? {
         let ctx = HwndCtx(pid: pid)
         let opaque = Unmanaged.passUnretained(ctx).toOpaque()
         _ = EnumWindows(guiportScreenshotEnumWindowsCallback, LPARAM(Int(bitPattern: opaque)))
