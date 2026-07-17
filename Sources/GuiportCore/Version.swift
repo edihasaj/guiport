@@ -1,3 +1,3 @@
 public enum Guiport {
-    public static let version = "0.1.44"
+    public static let version = "0.1.45"
 }
