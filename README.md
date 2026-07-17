@@ -3,7 +3,7 @@
 </p>
 
 <p align="center"><em>Playwright for desktop apps, built for coding agents.</em></p>
-<p align="center"><strong>macOS shipped · Windows beta · Linux beta.</strong></p>
+<p align="center"><strong>Available on macOS · Windows · Linux.</strong></p>
 
 <p align="center">
   <a href="https://github.com/edihasaj/guiport/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/edihasaj/guiport/actions/workflows/ci.yml/badge.svg"/></a>
@@ -18,11 +18,13 @@ A fast CLI/MCP control layer that lets agents like Claude, Codex, opencode, and 
 
 ## Status
 
-MVP. macOS is the primary target — Accessibility tree first, screenshots as fallback.
+Available on macOS, Windows, and Linux. macOS is the primary target and runs the full stack — Accessibility tree first, screenshots as fallback.
 
-Windows is in beta with a day-1 input/screenshot/apps surface (Win32 SendInput, GDI BitBlt/PrintWindow, EnumWindows). UIA-backed tree/observe/find/click-by-selector and WinRT OCR are pending — they throw a clear `uia_pending` / `ocr_pending` error today. Track progress under the [`windows`](https://github.com/edihasaj/guiport/issues?q=label%3Awindows) label.
+Windows ships a standalone binary (bundled Swift runtime, no toolchain needed) with input/screenshot/apps (Win32 SendInput, GDI BitBlt/PrintWindow → real PNG, EnumWindows). UIA-backed tree/observe/find/click-by-selector and WinRT OCR are pending — they throw a clear `uia_pending` / `ocr_pending` error today. Track progress under the [`windows`](https://github.com/edihasaj/guiport/issues?q=label%3Awindows) label.
 
-Linux is in beta with the same shape: shell-out to `xdotool`/`wmctrl`/`scrot` on X11 and `ydotool`/`grim` on Wayland for input + screenshot, `/proc` + `wmctrl` for app enumeration. AT-SPI2-backed tree/observe/find and tesseract OCR throw `atspi_pending` / `ocr_pending` until those bindings land. Track under [`linux`](https://github.com/edihasaj/guiport/issues?q=label%3Alinux).
+Linux ships a standalone binary (static Swift stdlib, glibc 2.35+) with the same shape: shell-out to `xdotool`/`wmctrl`/`scrot` on X11 and `ydotool`/`grim` on Wayland for input + screenshot, `/proc` + `wmctrl` for app enumeration. AT-SPI2-backed tree/observe/find and tesseract OCR throw `atspi_pending` / `ocr_pending` until those bindings land. Track under [`linux`](https://github.com/edihasaj/guiport/issues?q=label%3Alinux).
+
+Prebuilt binaries for all three platforms are attached to every [release](https://github.com/edihasaj/guiport/releases/latest).
 
 ## Why
 
@@ -54,13 +56,13 @@ guiport doctor         # all green when ready
 real `guiport` app entry in Accessibility and Screen Recording instead of only
 the invoking terminal.
 
-Windows (beta — input/screenshot/apps; UIA tree pending):
+Windows (input/screenshot/apps; UIA tree pending) — grab the prebuilt `guiport-<ver>-windows-x64.zip` from [releases](https://github.com/edihasaj/guiport/releases/latest), or install from source:
 
 ```powershell
 iwr -useb https://raw.githubusercontent.com/edihasaj/guiport/main/scripts/install.ps1 | iex
 ```
 
-Linux (beta — same shape; AT-SPI2 tree pending). Install xdotool+wmctrl+scrot (X11) or ydotool+grim (Wayland), then:
+Linux (same shape; AT-SPI2 tree pending) — grab the prebuilt `guiport-<ver>-linux-x86_64.tar.gz` from [releases](https://github.com/edihasaj/guiport/releases/latest). Install xdotool+wmctrl+scrot (X11) or ydotool+grim (Wayland), then:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/edihasaj/guiport/main/scripts/install.sh | sh
@@ -160,7 +162,7 @@ background process lands on screen.
 
 ## Non-goals (MVP)
 
-- No Windows/Linux yet.
+- No full a11y-tree selectors on Windows/Linux yet (UIA / AT-SPI2 pending; input, screenshot, and app control ship today).
 - No vision-first automation.
 - No autonomous Manus clone.
 - No background/session-0 automation.

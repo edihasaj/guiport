@@ -134,7 +134,7 @@ main { position: relative; z-index: 1; max-width: 940px; margin: 0 auto; padding
   text-transform: lowercase;
 }
 .pill.ok    { background: rgba(245,165,36,0.14); color: var(--amber-2); border: 1px solid rgba(245,165,36,0.45); }
-.pill.beta  { background: rgba(111,231,181,0.12); color: var(--green); border: 1px solid rgba(111,231,181,0.40); }
+.pill.avail { background: rgba(111,231,181,0.12); color: var(--green); border: 1px solid rgba(111,231,181,0.40); }
 .pill.soon  { background: rgba(156,163,181,0.10); color: var(--ink-dim); border: 1px solid var(--line); }
 
 .btn.small { padding: 6px 12px; font-size: 12px; }
@@ -150,7 +150,7 @@ main { position: relative; z-index: 1; max-width: 940px; margin: 0 auto; padding
   display: flex; flex-direction: column;
 }
 .plat-ok { border-left: 3px solid var(--amber); }
-.plat-beta { border-left: 3px solid var(--green); }
+.plat-avail { border-left: 3px solid var(--green); }
 .plat-soon { opacity: 0.85; }
 .plat-wip { color: var(--ink-dim); font-style: italic; }
 .plat-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }

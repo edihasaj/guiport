@@ -2,13 +2,13 @@
 
 ## Platform support
 
-| Platform | Status                                                         | Path                              |
-|----------|----------------------------------------------------------------|-----------------------------------|
-| macOS    | **Supported** (13+, primary target)                            | Homebrew, install script, source  |
-| Windows  | **Beta** — input/screenshot/apps shipped; UIA tree pending     | PowerShell install script, source |
-| Linux    | **Beta** — input/screenshot/apps shipped; AT-SPI2 tree pending | install script, source            |
+| Platform | Status                                                            | Path                                      |
+|----------|-------------------------------------------------------------------|-------------------------------------------|
+| macOS    | **Available** (13+, primary target — full stack)                  | Homebrew, install script, source          |
+| Windows  | **Available** — input/screenshot/apps; UIA tree pending           | Prebuilt binary (Releases), source        |
+| Linux    | **Available** — input/screenshot/apps; AT-SPI2 tree pending       | Prebuilt binary (Releases), install script, source |
 
-The macOS path remains the primary target per [`goal.md`](goal.md). Windows ships a day-1 surface (Win32 SendInput, GDI BitBlt/PrintWindow, EnumWindows); UIA-backed tree/observe/find/click-by-selector and WinRT OCR are tracked under [`windows`](https://github.com/edihasaj/guiport/issues?q=label%3Awindows). Linux ships the same shape via thin wrappers around `xdotool`/`wmctrl`/`scrot` (X11) and `ydotool`/`grim` (Wayland); AT-SPI2 tree + tesseract OCR are tracked under [`linux`](https://github.com/edihasaj/guiport/issues?q=label%3Alinux). All UIA/AT-SPI/OCR-gated calls throw clear `*_pending` errors today instead of silently failing.
+Prebuilt binaries for all three platforms are attached to every [release](https://github.com/edihasaj/guiport/releases/latest) — Windows ships with the Swift runtime DLLs bundled and Linux is statically linked (glibc 2.35+), so neither needs a Swift toolchain installed. The macOS path remains the primary target per [`goal.md`](goal.md). Windows ships input/screenshot/apps (Win32 SendInput, GDI BitBlt/PrintWindow → real PNG, EnumWindows); UIA-backed tree/observe/find/click-by-selector and WinRT OCR are tracked under [`windows`](https://github.com/edihasaj/guiport/issues?q=label%3Awindows). Linux ships the same shape via thin wrappers around `xdotool`/`wmctrl`/`scrot` (X11) and `ydotool`/`grim` (Wayland); AT-SPI2 tree + tesseract OCR are tracked under [`linux`](https://github.com/edihasaj/guiport/issues?q=label%3Alinux). All UIA/AT-SPI/OCR-gated calls throw clear `*_pending` errors today instead of silently failing.
 
 ## macOS
 
@@ -73,9 +73,18 @@ Verify:
 guiport doctor
 ```
 
-## Linux (beta)
+## Linux
 
-X11 or Wayland session. The installer clones the repo and builds via `swift build -c release`, so a Swift toolchain (e.g. via [swiftly](https://www.swift.org/install/linux/)) must be on PATH.
+X11 or Wayland session. Fastest path — download the prebuilt, statically linked binary (glibc 2.35+, no Swift toolchain needed):
+
+```sh
+curl -fsSL https://github.com/edihasaj/guiport/releases/latest/download/guiport-linux-x86_64.tar.gz | tar xz
+sudo install guiport /usr/local/bin/guiport
+```
+
+> The asset is versioned (`guiport-<ver>-linux-x86_64.tar.gz`); grab the exact name from the [latest release](https://github.com/edihasaj/guiport/releases/latest).
+
+Or build from source — the installer clones the repo and builds via `swift build -c release`, so a Swift toolchain (e.g. via [swiftly](https://www.swift.org/install/linux/)) must be on PATH:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/edihasaj/guiport/main/scripts/install.sh | sh
@@ -118,9 +127,16 @@ sudo systemctl --user enable --now ydotool             # ydotoold needs /dev/uin
 
 `ydotool` requires the `ydotoold` daemon running with access to `/dev/uinput`. If `SendInput`-style calls fail with "input_failed", confirm the daemon is up (`systemctl --user status ydotool`) and that your user has uinput access.
 
-## Windows (beta)
+## Windows
 
-Windows 10+ on x64. The installer clones the repo and builds via `swift build -c release`, so you need a Swift toolchain on PATH first — install from [swift.org/install/windows](https://www.swift.org/install/windows/).
+Windows 10+ on x64. Fastest path — download the prebuilt `guiport-<ver>-windows-x64.zip` from the [latest release](https://github.com/edihasaj/guiport/releases/latest) and unzip it anywhere. The Swift runtime DLLs are bundled alongside `guiport.exe`, so **no Swift toolchain is required** — keep the DLLs next to the exe and add the folder to PATH.
+
+```powershell
+# from an unzipped release folder
+.\guiport.exe --version
+```
+
+Or build from source — the installer clones the repo and builds via `swift build -c release`, so you need a Swift toolchain on PATH first ([swift.org/install/windows](https://www.swift.org/install/windows/)):
 
 ```powershell
 iwr -useb https://raw.githubusercontent.com/edihasaj/guiport/main/scripts/install.ps1 | iex

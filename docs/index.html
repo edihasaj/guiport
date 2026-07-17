@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>guiport — Playwright for desktop apps, built for coding agents</title>
-<meta name="description" content="Fast CLI/MCP control layer that lets agents like Claude, Codex, opencode, and Gemini inspect and operate macOS apps through structured UI data, then save flows as replayable tests.">
+<meta name="description" content="Fast CLI/MCP control layer that lets agents like Claude, Codex, opencode, and Gemini inspect and operate desktop apps through structured UI data, then save flows as replayable tests. macOS, Windows, and Linux.">
 <meta property="og:title" content="guiport">
 <meta property="og:description" content="Playwright for desktop apps, built for coding agents.">
 <meta property="og:image" content="assets/icon-512.png">
@@ -61,7 +61,7 @@
   </h1>
   <p class="tagline">Playwright for desktop apps,<br>built for coding agents.</p>
 
-  <pre class="hero-block"><span class="comment"># inspect, control, and replay any macOS app</span>
+  <pre class="hero-block"><span class="comment"># inspect, control, and replay any desktop app — macOS, Windows, Linux</span>
 guiport observe --app Calculator
 guiport click   --app Calculator <span class="str">'AXButton[identifier="Five"]'</span>
 guiport run     <span class="str">smoke.yaml</span>
@@ -74,8 +74,8 @@ guiport serve   --mcp   <span class="comment"># expose to Claude / Codex / openc
 
   <p class="badges">
     <span class="pill ok">macOS · shipped</span>
-    <span class="pill beta">Windows · beta</span>
-    <span class="pill beta">Linux · beta</span>
+    <span class="pill avail">Windows · available</span>
+    <span class="pill avail">Linux · available</span>
     <span>·</span>
     <span>Swift 5.9+</span>
     <span>·</span>
@@ -117,7 +117,7 @@ guiport serve   --mcp   <span class="comment"># expose to Claude / Codex / openc
 <section id="install" class="numbered">
   <span class="num">02</span>
   <h2>Install.</h2>
-  <p>macOS 13+ for the full a11y-selector experience. Windows &amp; Linux ship standalone binaries today (beta) — screenshot, input, and app enumeration; selector support is landing next.</p>
+  <p>Available on macOS, Windows, and Linux. macOS 13+ runs the full accessibility-selector stack; Windows &amp; Linux ship standalone binaries today — screenshot, keyboard/mouse input, and app control — with a11y-tree selectors landing next.</p>
 
   <div class="install-tabs">
     <details open>
@@ -131,7 +131,7 @@ guiport doctor         # all green when ready</pre>
       <pre>curl -fsSL https://raw.githubusercontent.com/edihasaj/guiport/main/scripts/install.sh | sh</pre>
     </details>
     <details>
-      <summary>Windows / Linux <span class="hint">(beta binaries)</span></summary>
+      <summary>Windows / Linux <span class="hint">(standalone binaries)</span></summary>
       <pre><span class="comment"># grab the latest standalone binary from Releases</span>
 <span class="comment"># Windows: guiport-&lt;ver&gt;-windows-x64.zip  (runtime DLLs bundled)</span>
 <span class="comment"># Linux:   guiport-&lt;ver&gt;-linux-x86_64.tar.gz (static stdlib, glibc 2.35+)</span></pre>
@@ -294,7 +294,7 @@ steps:
 <section id="platforms" class="numbered">
   <span class="num">08</span>
   <h2>Platforms.</h2>
-  <p>One CLI, one YAML schema, one MCP tool list across every platform. <strong>macOS ships today</strong> with the full accessibility-selector stack. <strong>Windows and Linux ship standalone binaries now</strong> — screenshot, input, and app enumeration are live; the a11y-tree selectors are landing next, behind the same contract.</p>
+  <p>One CLI, one YAML schema, one MCP tool list across every platform — <strong>available on macOS, Windows, and Linux.</strong> macOS runs the full accessibility-selector stack today; Windows and Linux ship standalone binaries with screenshot, keyboard/mouse input, and app control, and the a11y-tree selectors slot in behind the same contract.</p>
 
   <div class="platforms">
     <div class="plat plat-ok">
@@ -314,10 +314,10 @@ steps:
       </div>
     </div>
 
-    <div class="plat plat-beta">
+    <div class="plat plat-avail">
       <div class="plat-head">
         <span class="plat-os">Windows</span>
-        <span class="pill beta">beta</span>
+        <span class="pill avail">available</span>
       </div>
       <div class="plat-body">
         <div class="plat-meta">Windows 10/11 · x64 · runtime bundled</div>
@@ -331,10 +331,10 @@ steps:
       </div>
     </div>
 
-    <div class="plat plat-beta">
+    <div class="plat plat-avail">
       <div class="plat-head">
         <span class="plat-os">Linux</span>
-        <span class="pill beta">beta</span>
+        <span class="pill avail">available</span>
       </div>
       <div class="plat-body">
         <div class="plat-meta">X11 · x86_64 · static stdlib (glibc 2.35+)</div>
@@ -366,7 +366,7 @@ steps:
    ┌──────────┼──────────┐
    ▼          ▼          ▼
  macOS      Windows    Linux
- <span class="kw">shipped</span>     <span class="str">beta</span>      <span class="str">beta</span></pre>
+ <span class="kw">shipped</span>     <span class="str">available</span>  <span class="str">available</span></pre>
 
   <p>Same selectors, same YAML, same MCP tools — across every platform. macOS runs the full stack today; Windows and Linux ship binaries now with capture + input, and the a11y selectors slot in behind the same shared contract. Your replay tests never know which OS is underneath.</p>
 </section>
