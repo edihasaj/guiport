@@ -113,6 +113,13 @@ guiport click --app "Safari" 'button[name="Save"]'
 guiport type "hello"
 guiport screenshot --app "Safari" -o safari.png
 
+# Foreground an app without a click, guard keystrokes, and verify state:
+guiport activate --app "Safari"                      # raise it (no relaunch, no click)
+guiport type --into "Safari" "hello"                 # activate + verify, then type
+guiport type --require-frontmost "Safari" "hello"    # refuse if Safari isn't frontmost
+guiport assert --app "Safari" --frontmost \
+  --front-title-contains "Start Page"                # nonzero exit when unmet
+
 # Vision fallback for canvas / sparse-AX apps:
 guiport find-text --app "Figma" "Save"               # OCR via Apple Vision
 guiport click-text --app "Figma" "Save"              # OCR + click center

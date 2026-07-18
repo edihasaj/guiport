@@ -9,10 +9,13 @@ struct HotkeyCommand: AsyncParsableCommand {
 
     @OptionGroup var output: OutputOption
 
+    @OptionGroup var guardFrontmost: FrontmostGuard
+
     @Argument(help: "Combo, e.g. `cmd+s`, `cmd+shift+t`, `escape`.")
     var combo: String
 
     func run() async throws {
+        try guardFrontmost.enforce()
         let result = try Adapter.current.hotkey(combo: combo)
         try JSONOutput.print(result, pretty: output.pretty)
     }

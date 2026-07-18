@@ -53,4 +53,26 @@ final class SelectorTests: XCTestCase {
         XCTAssertEqual(result.count, 1)
         XCTAssertEqual(result.first?.identifier, "save_btn")
     }
+
+    func testMatchBooleanState() throws {
+        let focused = AXNode(id: "/a", role: "AXTextField", subrole: nil, name: "email",
+                             value: nil, identifier: nil, description: nil, help: nil,
+                             bounds: nil, enabled: true, focused: true, selected: nil,
+                             actions: [], children: [])
+        let blurred = AXNode(id: "/b", role: "AXTextField", subrole: nil, name: "name",
+                             value: nil, identifier: nil, description: nil, help: nil,
+                             bounds: nil, enabled: false, focused: false, selected: nil,
+                             actions: [], children: [])
+        let root = AXNode(id: "/", role: "AXWindow", subrole: nil, name: "Win",
+                          value: nil, identifier: nil, description: nil, help: nil,
+                          bounds: nil, enabled: nil, focused: nil, selected: nil,
+                          actions: [], children: [focused, blurred])
+
+        XCTAssertEqual(try Selector.parse("AXTextField[focused=true]").match(root).map(\.id), ["/a"])
+        XCTAssertEqual(try Selector.parse("AXTextField[focused=false]").match(root).map(\.id), ["/b"])
+        XCTAssertEqual(try Selector.parse("AXTextField[enabled=true]").match(root).map(\.id), ["/a"])
+        // A nil flag never matches either polarity.
+        XCTAssertTrue(try Selector.parse("AXWindow[focused=true]").match(root).isEmpty)
+        XCTAssertTrue(try Selector.parse("AXWindow[focused=false]").match(root).isEmpty)
+    }
 }

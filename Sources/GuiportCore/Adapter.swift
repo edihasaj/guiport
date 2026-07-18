@@ -46,6 +46,19 @@ public protocol DesktopAdapter: Sendable {
     func resolveApp(name: String?, windowTitle: String?) throws -> AppTarget
     func windowCount(pid: Int32) -> Int
 
+    // MARK: - Activation / focus
+
+    /// Foreground a running app **without relaunching it and without a synthetic
+    /// click** (which would move the mouse / risk hitting content). No-op-safe
+    /// when already frontmost; throws a clear error when the app isn't running.
+    /// macOS raises via `NSRunningApplication.activate`; Windows/Linux map to
+    /// `SetForegroundWindow` / a WM raise behind the same verb later.
+    func activate(target: AppTarget) throws -> ActivationResult
+
+    /// The app currently in the foreground, or `nil` when the platform can't
+    /// report it. Backs frontmost guards and `assert --frontmost`.
+    func frontmostApp() -> AppInfo?
+
     // MARK: - AX inspection
 
     func observe(target: AppTarget) throws -> AXSummary
@@ -100,6 +113,21 @@ public extension DesktopAdapter {
     func tree(target: AppTarget, maxDepth: Int, includeHidden: Bool) throws -> AXNode {
         try tree(target: target, maxDepth: maxDepth, includeHidden: includeHidden, scope: .auto)
     }
+
+    /// Default: no activation on platforms that haven't wired the raise call yet.
+    /// The macOS adapter overrides. Keeping it here lets Windows/Linux stay
+    /// conformant while their raise verb is on the roadmap.
+    func activate(target: AppTarget) throws -> ActivationResult {
+        throw GuiportError(
+            code: "platform_unsupported",
+            message: "activate is not implemented on \(platformName) yet",
+            hint: "macOS raises via NSRunningApplication.activate; Windows SetForegroundWindow and Linux WM raise are tracked on the roadmap."
+        )
+    }
+
+    /// Default: platform can't report the frontmost app. Guards that depend on
+    /// this fail closed (refuse to send keys), which is the safe behavior.
+    func frontmostApp() -> AppInfo? { nil }
 }
 
 /// Shared adapter registry. The executable installs the platform adapter at startup;

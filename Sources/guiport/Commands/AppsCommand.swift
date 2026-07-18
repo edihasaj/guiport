@@ -19,7 +19,8 @@ struct AppsCommand: AsyncParsableCommand {
         } else {
             for a in apps {
                 let pid = a.pid.map { String($0) } ?? "-"
-                print("\(a.name)\t\(a.bundleId ?? "-")\tpid=\(pid)\twindows=\(a.windowCount)")
+                let active = a.active ? "\tactive" : ""
+                print("\(a.name)\t\(a.bundleId ?? "-")\tpid=\(pid)\twindows=\(a.windowCount)\(active)")
             }
         }
     }

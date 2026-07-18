@@ -165,6 +165,16 @@ public struct Selector {
     }
 
     private func matchPredicate(_ p: Predicate, node: AXNode) -> Bool {
+        // Boolean state attributes compare against the node's tri-state flags
+        // (nil = unknown, which never matches). Lets selectors express focus /
+        // enablement / selection, e.g. `AXTextField[focused=true]`.
+        switch p.attr.lowercased() {
+        case "focused": return matchBool(node.focused, p)
+        case "enabled": return matchBool(node.enabled, p)
+        case "selected": return matchBool(node.selected, p)
+        default: break
+        }
+
         let candidates: [String?]
         switch p.attr.lowercased() {
         case "name", "title": candidates = [node.name]
@@ -185,6 +195,21 @@ public struct Selector {
             }
         }
         return false
+    }
+
+    /// Match a tri-state bool flag against a predicate value. `contains` on a
+    /// bool is meaningless, so it's treated the same as equality. Accepts
+    /// `true`/`1`/`yes` and `false`/`0`/`no`; an unknown (nil) flag never matches.
+    private func matchBool(_ flag: Bool?, _ p: Predicate) -> Bool {
+        guard let flag else { return false }
+        let v = p.value.lowercased()
+        let want: Bool
+        switch v {
+        case "true", "1", "yes": want = true
+        case "false", "0", "no": want = false
+        default: return false
+        }
+        return flag == want
     }
 
     private func equalsLoose(_ a: String, _ b: String) -> Bool {

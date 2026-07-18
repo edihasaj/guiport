@@ -23,6 +23,8 @@ struct Guiport: AsyncParsableCommand {
             InitCommand.self,
             DoctorCommand.self,
             AppsCommand.self,
+            ActivateCommand.self,
+            AssertCommand.self,
             ObserveCommand.self,
             TreeCommand.self,
             FindCommand.self,

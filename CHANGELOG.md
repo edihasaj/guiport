@@ -40,6 +40,25 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
   stable-identifier ad-hoc signature.
 
 ### Added
+- **`guiport activate` / `guiport lifecycle activate`** — foreground a running
+  app **without relaunching it and without a synthetic click** (previously
+  activation only happened as a side effect of `click`, which moves the mouse
+  and can hit content). Uses `NSRunningApplication.activate` on macOS; no-op-safe
+  when already frontmost, clear `app_not_found` error when not running. The
+  `activate` verb is on the `DesktopAdapter` protocol so Windows
+  (`SetForegroundWindow`) and Linux (WM raise) can adopt it behind the same
+  surface; unimplemented platforms return an actionable `platform_unsupported`.
+- **Frontmost guard for `type` / `hotkey`.** `--into <app>` activates the target
+  and verifies it's frontmost before sending keys; `--require-frontmost <app>`
+  refuses (nonzero exit) unless the app is *already* frontmost. Prevents
+  keystrokes leaking into whatever app happens to be frontmost (a terminal, a
+  chat app). The guard fails closed on platforms that can't report the frontmost
+  app.
+- **`guiport assert`** — cheap, composable state checks between flow steps, with
+  a nonzero exit when unmet: `--running`, `--frontmost`,
+  `--front-title-contains <s>`, `--focused <selector>`. Reads are depth-1 and
+  fast. With no check flag it defaults to a running check. `apps` text output now
+  marks the frontmost app `active` (already present in `--json`).
 - `guiport doctor --fix` now self-registers `~/Applications/guiport.app` from
   the active binary before firing TCC prompts, so Accessibility and Screen
   Recording panes show a real `guiport` app entry even for Homebrew CLI installs.
