@@ -25,10 +25,12 @@ brew tap edihasaj/guiport
 brew install guiport
 ```
 
-Ships a universal (arm64 + x86_64) binary from the
+Ships a universal (arm64 + x86_64), Developer-ID-signed `guiport.app` from the
 [`edihasaj/homebrew-guiport`](https://github.com/edihasaj/homebrew-guiport)
-tap; each tagged release auto-bumps the formula, so `brew upgrade guiport`
-tracks the latest.
+tap and symlinks `bin/guiport` into it, so the process runs bundle-associated —
+guiport's real logo shows in the Privacy panes and the permission grant survives
+`brew upgrade` (stable code-signing identity, not per-build ad-hoc). Each tagged
+release auto-bumps the formula, so `brew upgrade guiport` tracks the latest.
 
 ### Install script
 
@@ -36,9 +38,10 @@ tracks the latest.
 curl -fsSL https://raw.githubusercontent.com/edihasaj/guiport/main/scripts/install.sh | sh
 ```
 
-The script installs Xcode CLT if missing, builds release, copies the binary to
-`/usr/local/bin/guiport`, and installs a signed `guiport.app` wrapper with the
-project icon for stable macOS permission grants.
+The script installs Xcode CLT if missing, builds release, installs a signed
+`guiport.app` (with the project icon) to `/Applications`, and symlinks
+`/usr/local/bin/guiport` into it — so the CLI runs bundle-associated for stable
+macOS permission grants.
 
 ### Build from source
 
@@ -46,8 +49,9 @@ project icon for stable macOS permission grants.
 git clone https://github.com/edihasaj/guiport.git
 cd guiport
 swift build -c release
-sudo cp .build/release/guiport /usr/local/bin/guiport
-scripts/install-macos-app.sh --bin /usr/local/bin/guiport
+# Build + install a signed guiport.app, then run the CLI from inside it.
+scripts/install-macos-app.sh --bin .build/release/guiport
+sudo ln -sf /Applications/guiport.app/Contents/MacOS/guiport /usr/local/bin/guiport
 ```
 
 ### Permissions
@@ -57,11 +61,13 @@ guiport needs two macOS permissions:
 1. **System Settings → Privacy & Security → Accessibility** — add `guiport`.
 2. **System Settings → Privacy & Security → Screen Recording** — add `guiport`.
 
-Run `guiport doctor --fix` to trigger both prompts and have macOS enrol `guiport`
-as its own subject (it uses ScreenCaptureKit, so the grant is attributed to
-`guiport` itself — not the terminal hosting it), then toggle it ON. It also
-registers `~/Applications/guiport.app` so the permission lists show a real app
-entry.
+Homebrew and the install script already run guiport from inside a signed
+`guiport.app`, so the permission lists show guiport's real logo and the grant is
+keyed to a stable identity. Run `guiport doctor --fix` to trigger both prompts
+and have macOS enrol `guiport` as its own subject (it uses ScreenCaptureKit, so
+the grant is attributed to `guiport` itself — not the terminal hosting it), then
+toggle it ON. (For bare `swift build` runs with no wrapper, `doctor --fix` also
+registers `~/Applications/guiport.app` so a real app entry still appears.)
 
 > Upgrading from an older build whose Screen Recording grant was attributed to your
 > terminal? Reset just guiport's stale entry without touching other apps:

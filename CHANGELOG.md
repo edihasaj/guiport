@@ -5,6 +5,17 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Changed
+- **Homebrew now ships a signed `guiport.app` and runs the CLI from inside it.**
+  The release wraps the universal binary in a Developer-ID-signed `guiport.app`
+  (`Contents/MacOS/guiport` + `.icns` + `Info.plist`) and the tap installs the
+  bundle, symlinking `bin/guiport` into `Contents/MacOS/guiport`. Because the
+  running process is now bundle-associated, macOS shows guiport's real logo in
+  the Accessibility and Screen Recording panes (instead of the generic
+  executable icon) and the TCC grant is keyed to a stable identity that survives
+  `brew upgrade` — no manual `.app` step, no duplicate entries. Bundle assembly
+  is centralised in `scripts/make-app-bundle.sh`, shared by the release workflow
+  and the local/install-script path (which now symlinks into the app too).
+  Closes #4.
 - Release binaries are now signed with the team **Developer ID Application**
   certificate (Applifyer, LLC — team `T8J48M4QVY`) instead of ad-hoc. This gives
   guiport a stable certificate-based designated requirement, so macOS keeps

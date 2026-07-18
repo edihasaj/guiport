@@ -52,9 +52,11 @@ guiport doctor --fix   # opens the right Privacy panes
 guiport doctor         # all green when ready
 ```
 
-`doctor --fix` also registers `~/Applications/guiport.app` so macOS shows a
-real `guiport` app entry in Accessibility and Screen Recording instead of only
-the invoking terminal.
+Homebrew ships (and runs the CLI from inside) a signed `guiport.app`, so macOS
+shows guiport's real logo in Accessibility and Screen Recording and the grant
+survives upgrades. For bare `swift build` runs, `doctor --fix` also registers
+`~/Applications/guiport.app` so a real `guiport` app entry still appears instead
+of only the invoking terminal.
 
 Windows (input/screenshot/apps; UIA tree pending) — grab the prebuilt `guiport-<ver>-windows-x64.zip` from [releases](https://github.com/edihasaj/guiport/releases/latest), or install from source:
 
@@ -125,8 +127,8 @@ OCR-found bounds drift across font/scale changes, so prefer AX selectors for rep
 - **Screen Recording** — required for `screenshot` and screenshot-on-failure artifacts.
 
 Run `guiport doctor` to check status and get System Settings deep links.
-Run `guiport doctor --fix` to register `~/Applications/guiport.app` and trigger
-the missing permission prompts.
+Run `guiport doctor --fix` to trigger the missing permission prompts (and, for
+bare `swift build` runs, register `~/Applications/guiport.app`).
 
 ## Driving input from a background agent
 
