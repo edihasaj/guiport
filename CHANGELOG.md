@@ -71,6 +71,12 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
   the project icon so macOS permission panes show the guiport logo.
 
 ### Fixed
+- **`brew upgrade guiport` no longer fails with `Errno::ENOENT - guiport.app`.**
+  The macOS release tarball shipped `guiport.app` as its sole top-level entry, so
+  Homebrew auto-descended into the bundle when staging and the formula's
+  `prefix.install "guiport.app"` ran from *inside* it. The release now nests the
+  bundle under a versioned wrapper dir (`guiport-X.Y.Z/guiport.app`), the layout
+  brew descends into exactly once — leaving the app addressable. Formula unchanged.
 - **Screen Recording now works regardless of the launching terminal.** macOS
   attributes Screen Recording *enforcement* to the responsible process — for a
   CLI, the terminal that spawned it — so a terminal lacking (or denied) the grant

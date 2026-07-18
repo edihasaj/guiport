@@ -181,9 +181,16 @@ jobs:
         run: |
           set -euo pipefail
           name="guiport-${NEXT}-macos-universal.tar.gz"
-          # COPYFILE_DISABLE keeps AppleDouble (._*) files out of the archive so
-          # the unpacked bundle stays a clean, still-signed guiport.app.
-          COPYFILE_DISABLE=1 tar -C dist -czf "$name" guiport.app
+          # Nest guiport.app under a versioned wrapper dir. Homebrew auto-descends
+          # into a *single* top-level directory when staging; a bare guiport.app at
+          # the root means the formula's `prefix.install "guiport.app"` runs with the
+          # working dir already *inside* the bundle (Errno::ENOENT - guiport.app).
+          # The wrapper dir is the conventional layout brew descends into exactly
+          # once, leaving guiport.app addressable. `ditto` preserves the bundle's
+          # signature; COPYFILE_DISABLE keeps AppleDouble (._*) files out.
+          stage="guiport-${NEXT}"
+          ditto dist/guiport.app "dist/${stage}/guiport.app"
+          COPYFILE_DISABLE=1 tar -C dist -czf "$name" "$stage"
           sha=$(shasum -a 256 "$name" | awk '{print $1}')
           echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
