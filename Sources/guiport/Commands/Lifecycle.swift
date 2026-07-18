@@ -62,7 +62,11 @@ enum Lifecycle {
             launched: true
         )
         #else
-        throw GuiportError(code: "unsupported", message: "lifecycle launch is only implemented on macOS")
+        throw GuiportError(
+            code: "unsupported",
+            message: "lifecycle launch is only implemented on macOS",
+            hint: "Windows/Linux app lifecycle is on the roadmap — track under the `windows` / `linux` labels."
+        )
         #endif
     }
 
@@ -135,7 +139,11 @@ enum Lifecycle {
             stopped: stillRunning.isEmpty
         )
         #else
-        throw GuiportError(code: "unsupported", message: "lifecycle quit is only implemented on macOS")
+        throw GuiportError(
+            code: "unsupported",
+            message: "lifecycle quit is only implemented on macOS",
+            hint: "Windows/Linux app lifecycle is on the roadmap — track under the `windows` / `linux` labels."
+        )
         #endif
     }
 
