@@ -133,6 +133,13 @@ private enum Tools {
         tool(name: "run", desc: "Run a YAML replay test.",
              props: ["path": ["type": "string"], "artifacts": ["type": "string"]],
              required: ["path"]),
+        tool(name: "plugin_list", desc: "List user plugins (reusable app automations) and their actions.",
+             props: ["dir": ["type": "string"]]),
+        tool(name: "plugin_run", desc: "Run a plugin action. `args` is an object of the action's params.",
+             props: ["plugin": ["type": "string"], "action": ["type": "string"],
+                     "args": ["type": "object"], "app": ["type": "string"],
+                     "dir": ["type": "string"], "artifacts": ["type": "string"]],
+             required: ["plugin", "action"]),
     ]
 
     static func call(name: String, args: [String: Any]) async throws -> String {
@@ -208,6 +215,22 @@ private enum Tools {
             guard let path = args["path"] as? String else { throw GuiportError(code: "missing_arg", message: "path required") }
             let dir = (args["artifacts"] as? String) ?? "artifacts"
             return try JSONOutput.encode(try await Runner.run(path: path, artifactsDir: dir), pretty: true)
+        case "plugin_list":
+            return try JSONOutput.encode(PluginStore.list(dir: args["dir"] as? String), pretty: true)
+        case "plugin_run":
+            guard let plugin = args["plugin"] as? String else { throw GuiportError(code: "missing_arg", message: "plugin required") }
+            guard let action = args["action"] as? String else { throw GuiportError(code: "missing_arg", message: "action required") }
+            var params: [String: String] = [:]
+            for (k, v) in (args["args"] as? [String: Any] ?? [:]) { params[k] = "\(v)" }
+            let loaded = try PluginStore.load(name: plugin, dir: args["dir"] as? String)
+            let artifacts = (args["artifacts"] as? String) ?? "artifacts"
+            return try JSONOutput.encode(
+                try await PluginStore.run(
+                    plugin: loaded, action: action, args: params,
+                    appOverride: args["app"] as? String, artifactsDir: artifacts
+                ),
+                pretty: true
+            )
         default:
             throw GuiportError(code: "unknown_tool", message: "unknown tool `\(name)`")
         }

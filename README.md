@@ -127,7 +127,52 @@ guiport click-at 420 180                             # raw coordinates
 guiport record smoke.yaml                            # WIP
 guiport run smoke.yaml
 guiport serve --mcp                                  # MCP server over stdio
+
+# Reusable, app-specific flows live in user plugins (never in core):
+guiport plugin list                                  # discover ~/.guiport/plugins
+guiport plugin run focus-and-type type-into text="hi" --app TextEdit
 ```
+
+## Plugins
+
+A **plugin** is a named, reusable flow built from the public primitives —
+"launch → foreground → navigate → verify → type" captured once instead of
+hand-rolled by every caller. Core ships **zero** app-specific knowledge; plugins
+live in a user directory so personal/private automations never touch the repo.
+
+- **Location:** `~/.guiport/plugins/*.{yaml,yml}` (override with
+  `GUIPORT_PLUGINS_DIR` or `--dir`).
+- **Shape:** a plugin targets one app and declares named **actions**; each action
+  is a list of flow steps (same grammar as `guiport run`) plus `{{param}}`
+  placeholders. Steps compose primitives (`activate`, `click`, `type`, `hotkey`,
+  `screenshot`) with **state predicates** (`assert: { frontmost, front_title_contains,
+  focused, find }`) so a flow verifies it's where it thinks it is before typing.
+
+```yaml
+# ~/.guiport/plugins/focus-and-type.yaml
+name: focus-and-type
+app: TextEdit
+actions:
+  - name: type-into
+    params: [text]
+    steps:
+      - activate: true                 # foreground, no relaunch, no stray click
+      - wait: 250
+      - assert: { frontmost: true }    # refuse to type into the wrong app
+      - click: 'AXTextArea'
+      - assert: { focused: 'AXTextArea' }
+      - type: '{{text}}'
+```
+
+```sh
+guiport plugin list                                  # human table (--json for machines)
+guiport plugin run focus-and-type type-into text="hello world"
+guiport plugin run <plugin> <action> key=value ...   # override app with --app
+```
+
+Exposed over MCP too, as the `plugin_list` and `plugin_run` tools. A runnable
+example ships in [`examples/plugins/`](examples/plugins/) — copy it into
+`~/.guiport/plugins/` (or pass `--dir examples/plugins`).
 
 ## Selector syntax
 

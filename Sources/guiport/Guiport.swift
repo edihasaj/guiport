@@ -37,6 +37,7 @@ struct Guiport: AsyncParsableCommand {
             ScreenshotCommand.self,
             RecordCommand.self,
             RunCommand.self,
+            PluginCommand.self,
             ServeCommand.self,
             AgentCommand.self,
             AgentDaemonCommand.self,

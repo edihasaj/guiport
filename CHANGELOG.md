@@ -5,6 +5,24 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Added
+- **Plugin / recipe system — reusable, app-specific flows without app logic in
+  core.** Plugins live in a user directory (`~/.guiport/plugins/*.{yaml,yml}`,
+  override via `GUIPORT_PLUGINS_DIR` or `--dir`), each targeting one app and
+  declaring named **actions** composed of the existing flow steps plus
+  `{{param}}` / `{{param|default}}` placeholders. New surface: `guiport plugin
+  list` (`--json`) and `guiport plugin run <plugin> <action> key=value …`
+  (`--app` override), plus `plugin_list` / `plugin_run` MCP tools. Actions run
+  through the same engine as `guiport run`, so failures capture the usual
+  `artifacts/fail-*` tree + screenshot. Ships a generic example
+  (`examples/plugins/focus-and-type.yaml`) built only from public primitives —
+  core carries zero app-specific knowledge. Closes the last item (A) of #1.
+- **`activate` flow step** — foreground the flow/plugin app (or `activate:
+  <app>`) via the no-relaunch/no-click raise, so keystrokes land where the flow
+  intends.
+- **`assert` flow step gained state predicates** beyond element existence:
+  `frontmost`, `front_title_contains`, and `focused: <selector>` (mirroring
+  `guiport assert`), letting flows/plugins verify they're on the right app and
+  field before typing. Existing `find` / `exists` asserts are unchanged.
 - **Cross-platform CI now builds _and_ tests all three platforms.** The Windows
   and Linux jobs run the platform-agnostic unit tests (`swift test --filter
   GuiportCoreTests`) after building — the filter still compiles every target

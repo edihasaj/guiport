@@ -1,0 +1,41 @@
+# Generic example plugin — built entirely from public guiport primitives, with
+# zero app-specific knowledge. It foregrounds an app, focuses its primary text
+# area, verifies it landed, and types text. Point it at any app with a plain
+# AXTextArea (TextEdit, Notes, most editors) by overriding --app.
+#
+#   guiport plugin run focus-and-type type-into text="hello world" --app TextEdit
+#
+# Install: copy this file to ~/.guiport/plugins/ (or pass --dir examples/plugins).
+name: focus-and-type
+app: TextEdit
+description: Foreground an app, focus its primary text area, verify, and type.
+actions:
+  - name: type-into
+    description: Raise the app, focus its first text area, and type {{text}}.
+    params: [text]
+    steps:
+      # Bring the app forward without a relaunch or a stray click.
+      - activate: true
+      # Give the window server a beat to settle the raise before asserting.
+      - wait: 250
+      # Cheap guard: refuse to type unless our app is actually frontmost.
+      - assert:
+          frontmost: true
+      # Focus the primary text input, then confirm focus before typing so
+      # keystrokes can't leak into the wrong field.
+      - click: 'AXTextArea'
+      - assert:
+          focused: 'AXTextArea'
+      - type: '{{text}}'
+
+  - name: append-line
+    description: Focus the text area and append a line (adds a newline first).
+    params: [text]
+    steps:
+      - activate: true
+      - assert:
+          frontmost: true
+      - click: 'AXTextArea'
+      - hotkey: 'cmd+down'
+      - type: '{{text}}'
+      - hotkey: 'return'

@@ -83,6 +83,49 @@ public enum Runner {
         )
     }
 
+    /// Execute a pre-parsed list of steps against `appName`, stopping at the
+    /// first failure. This is the shared engine behind both `run` (YAML flows)
+    /// and `guiport plugin run` (named plugin actions) — same step grammar, same
+    /// failure-artifact capture, same `RunResult` shape. `label` identifies the
+    /// source in the result (`path` for flows, `plugin:<name>/<action>` for
+    /// plugin actions).
+    public static func runSteps(
+        _ steps: [Any], label: String, appName: String?, timeoutMs: Int, artifactsDir: String
+    ) async -> RunResult {
+        try? FileManager.default.createDirectory(atPath: artifactsDir, withIntermediateDirectories: true)
+
+        var results: [StepResult] = []
+        var passed = true
+        var failureArtifacts: [String] = []
+
+        for (i, raw) in steps.enumerated() {
+            let started = Date()
+            do {
+                let step = try await execStep(raw, appName: appName, timeoutMs: timeoutMs)
+                results.append(.init(
+                    action: step.action, passed: true,
+                    durationMs: ms(since: started), detail: step.detail, error: nil
+                ))
+            } catch {
+                let arts = saveFailureArtifacts(
+                    stepIndex: i, dir: artifactsDir, appName: appName, action: actionLabel(of: raw)
+                )
+                failureArtifacts.append(contentsOf: arts)
+                results.append(.init(
+                    action: actionLabel(of: raw), passed: false,
+                    durationMs: ms(since: started), detail: nil, error: "\(error)"
+                ))
+                passed = false
+                break
+            }
+        }
+
+        return RunResult(
+            path: label, passed: passed, steps: results, artifactsDir: artifactsDir,
+            failureArtifacts: failureArtifacts.isEmpty ? nil : failureArtifacts
+        )
+    }
+
     private static func parseFlow(_ raw: String) throws -> [String: Any] {
         var result: [String: Any] = [:]
         let lines = raw.components(separatedBy: .newlines)
@@ -94,42 +137,7 @@ public enum Runner {
             if line.isEmpty { continue }
 
             if line == "steps:" {
-                var steps: [Any] = []
-                while index < lines.count {
-                    let rawStep = stripComment(lines[index])
-                    let trimmed = rawStep.trimmingCharacters(in: .whitespaces)
-                    if trimmed.isEmpty {
-                        index += 1
-                        continue
-                    }
-                    if !rawStep.hasPrefix(" ") && !rawStep.hasPrefix("\t") { break }
-                    guard trimmed.hasPrefix("- ") else {
-                        throw GuiportError(code: "yaml_parse", message: "step must start with `- `")
-                    }
-                    let item = String(trimmed.dropFirst(2))
-                    let (key, valueText) = try splitMapping(item)
-                    index += 1
-
-                    if valueText.isEmpty {
-                        var nested: [String: Any] = [:]
-                        while index < lines.count {
-                            let rawNested = stripComment(lines[index])
-                            let nestedTrimmed = rawNested.trimmingCharacters(in: .whitespaces)
-                            if nestedTrimmed.isEmpty {
-                                index += 1
-                                continue
-                            }
-                            if !rawNested.hasPrefix("    ") && !rawNested.hasPrefix("\t\t") { break }
-                            let (nestedKey, nestedValue) = try splitMapping(nestedTrimmed)
-                            nested[nestedKey] = parseScalar(nestedValue)
-                            index += 1
-                        }
-                        steps.append([key: nested])
-                    } else {
-                        steps.append([key: parseScalar(valueText)])
-                    }
-                }
-                result["steps"] = steps
+                result["steps"] = try parseStepList(lines, &index, minIndent: 1)
                 continue
             }
 
@@ -143,7 +151,65 @@ public enum Runner {
         return result
     }
 
-    private static func stripComment(_ line: String) -> String {
+    /// Parse a YAML block of `- key: value` step items (with optional nested
+    /// mappings) starting at `index`. The item column is auto-detected from the
+    /// first item; parsing stops at the first non-blank line indented less than
+    /// that column (a dedent), leaving `index` on it. `minIndent` is the floor
+    /// the first item must reach to count as part of the block — used so a
+    /// `steps:` key with no indented items yields an empty list rather than
+    /// swallowing following siblings. Shared by the flow runner and the plugin
+    /// action loader so both understand the exact same step grammar.
+    static func parseStepList(_ lines: [String], _ index: inout Int, minIndent: Int) throws -> [Any] {
+        var steps: [Any] = []
+        var itemIndent = -1
+        while index < lines.count {
+            let rawStep = stripComment(lines[index])
+            let trimmed = rawStep.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty { index += 1; continue }
+            let indent = leadingSpaces(rawStep)
+            if itemIndent < 0 {
+                if indent < minIndent { break }
+                itemIndent = indent
+            }
+            if indent < itemIndent { break }
+            guard trimmed.hasPrefix("- ") else {
+                throw GuiportError(code: "yaml_parse", message: "step must start with `- `")
+            }
+            let item = String(trimmed.dropFirst(2))
+            let (key, valueText) = try splitMapping(item)
+            index += 1
+
+            if valueText.isEmpty {
+                var nested: [String: Any] = [:]
+                while index < lines.count {
+                    let rawNested = stripComment(lines[index])
+                    let nestedTrimmed = rawNested.trimmingCharacters(in: .whitespaces)
+                    if nestedTrimmed.isEmpty { index += 1; continue }
+                    if leadingSpaces(rawNested) <= itemIndent { break }
+                    let (nestedKey, nestedValue) = try splitMapping(nestedTrimmed)
+                    nested[nestedKey] = parseScalar(nestedValue)
+                    index += 1
+                }
+                steps.append([key: nested])
+            } else {
+                steps.append([key: parseScalar(valueText)])
+            }
+        }
+        return steps
+    }
+
+    /// Count leading indentation, treating a tab as four columns.
+    static func leadingSpaces(_ s: String) -> Int {
+        var n = 0
+        for ch in s {
+            if ch == " " { n += 1 }
+            else if ch == "\t" { n += 4 }
+            else { break }
+        }
+        return n
+    }
+
+    static func stripComment(_ line: String) -> String {
         var inSingle = false
         var inDouble = false
         for (idx, ch) in line.enumerated() {
@@ -157,7 +223,7 @@ public enum Runner {
         return line
     }
 
-    private static func splitMapping(_ line: String) throws -> (String, String) {
+    static func splitMapping(_ line: String) throws -> (String, String) {
         guard let colon = line.firstIndex(of: ":") else {
             throw GuiportError(code: "yaml_parse", message: "expected `key: value`, got `\(line)`")
         }
@@ -169,7 +235,7 @@ public enum Runner {
         return (key, value)
     }
 
-    private static func parseScalar(_ value: String) -> Any {
+    static func parseScalar(_ value: String) -> Any {
         if value == "true" { return true }
         if value == "false" { return false }
         if let int = Int(value) { return int }
@@ -200,6 +266,19 @@ public enum Runner {
             let ms = (value as? Int) ?? 0
             try await Task.sleep(nanoseconds: UInt64(ms) * 1_000_000)
             return .init(action: "wait", detail: "\(ms)ms")
+
+        case "activate":
+            // `activate: true` foregrounds the flow/plugin app; `activate: <app>`
+            // targets a different app. Raises without relaunch or a synthetic
+            // click, so keystrokes land where the flow intends.
+            let target: String?
+            if let s = value as? String { target = s } else { target = appName }
+            guard let name = target else {
+                throw GuiportError(code: "step_parse", message: "activate needs an app (set the flow `app:` or `activate: <app>`)")
+            }
+            let resolved = try Adapter.current.resolveApp(name: name)
+            _ = try Adapter.current.activate(target: resolved)
+            return .init(action: "activate", detail: name)
 
         case "find":
             guard let sel = value as? String else { throw GuiportError(code: "step_parse", message: "find expects a string selector") }
@@ -272,20 +351,60 @@ public enum Runner {
             guard let dict = value as? [String: Any] else {
                 throw GuiportError(code: "step_parse", message: "assert expects a mapping")
             }
-            guard let sel = dict["find"] as? String else {
-                throw GuiportError(code: "step_parse", message: "assert needs `find: selector`")
-            }
-            let exists = (dict["exists"] as? Bool) ?? true
+            // Predicates mirror `guiport assert`: element existence (`find`/`exists`)
+            // plus cheap state checks (`frontmost`, `front_title_contains`,
+            // `focused`) so flows/plugins can verify they're where they think
+            // they are before typing. At least one predicate is required.
             let target = try Adapter.current.resolveApp(name: appName)
-            do {
-                _ = try await waitFor(selector: sel, target: target, timeoutMs: timeoutMs)
-                if !exists {
-                    throw GuiportError(code: "assert_failed", message: "\(sel) exists, expected absent")
+            var detail: [String] = []
+            var checked = false
+
+            if let sel = dict["find"] as? String {
+                checked = true
+                detail.append(sel)
+                let exists = (dict["exists"] as? Bool) ?? true
+                do {
+                    _ = try await waitFor(selector: sel, target: target, timeoutMs: timeoutMs)
+                    if !exists {
+                        throw GuiportError(code: "assert_failed", message: "\(sel) exists, expected absent")
+                    }
+                } catch {
+                    if exists { throw error }
                 }
-            } catch {
-                if exists { throw error }
             }
-            return .init(action: "assert", detail: sel)
+
+            if let front = dict["frontmost"] as? Bool, front {
+                checked = true
+                detail.append("frontmost")
+                let f = Adapter.current.frontmostApp()
+                if f?.pid != target.pid {
+                    throw GuiportError(code: "assert_failed", message: "\(appName ?? "app") is not frontmost (front: \(f?.name ?? "unknown"))")
+                }
+            }
+
+            if let needle = dict["front_title_contains"] as? String {
+                checked = true
+                detail.append("title~\(needle)")
+                let title = (try? Adapter.current.observe(target: target))?.window?.title
+                if title?.range(of: needle, options: .caseInsensitive) == nil {
+                    throw GuiportError(code: "assert_failed", message: "front title \"\(title ?? "nil")\" does not contain \"\(needle)\"")
+                }
+            }
+
+            if let sel = dict["focused"] as? String {
+                checked = true
+                detail.append("focused:\(sel)")
+                let parsed = try Selector.parse(sel)
+                let tree = try Adapter.current.tree(target: target)
+                if !parsed.match(tree).contains(where: { $0.focused == true }) {
+                    throw GuiportError(code: "assert_failed", message: "no focused element matches \(sel)")
+                }
+            }
+
+            guard checked else {
+                throw GuiportError(code: "step_parse", message: "assert needs one of `find`, `frontmost`, `front_title_contains`, `focused`")
+            }
+            return .init(action: "assert", detail: detail.joined(separator: ", "))
 
         default:
             throw GuiportError(code: "unknown_step", message: "unknown step `\(key)`")

@@ -266,7 +266,8 @@ steps:
       find:   <span class="str">'AXStaticText[value~="8"]'</span>
       exists: true</pre>
 
-  <p>Step types: <code>wait</code> · <code>find</code> · <code>click</code> · <code>press</code> · <code>type</code> · <code>hotkey</code> · <code>screenshot</code> · <code>find_text</code> · <code>click_text</code> · <code>click_at</code> · <code>assert</code>.</p>
+  <p>Step types: <code>wait</code> · <code>activate</code> · <code>find</code> · <code>click</code> · <code>press</code> · <code>type</code> · <code>hotkey</code> · <code>screenshot</code> · <code>find_text</code> · <code>click_text</code> · <code>click_at</code> · <code>assert</code> (existence + <code>frontmost</code> / <code>front_title_contains</code> / <code>focused</code>).</p>
+  <p>Package these flows as reusable, app-specific <a href="https://github.com/edihasaj/guiport#plugins">plugins</a> in <code>~/.guiport/plugins</code> — <code>guiport plugin run &lt;name&gt; &lt;action&gt;</code> — with no app knowledge baked into core.</p>
   <p>Failures snapshot the AX tree (JSON) + screenshot + action log into <code>artifacts/fail-*</code> for fast diagnosis.</p>
 </section>
 
@@ -287,7 +288,7 @@ steps:
    }
 }}</pre>
 
-  <p>Tools exposed: <code>doctor</code>, <code>apps</code>, <code>observe</code>, <code>tree</code>, <code>find</code>, <code>click</code> (+ <code>fallback</code>), <code>click_at</code>, <code>find_text</code>, <code>click_text</code>, <code>type</code>, <code>hotkey</code>, <code>screenshot</code>, <code>run</code>.</p>
+  <p>Tools exposed: <code>doctor</code>, <code>apps</code>, <code>observe</code>, <code>tree</code>, <code>find</code>, <code>click</code> (+ <code>fallback</code>), <code>click_at</code>, <code>find_text</code>, <code>click_text</code>, <code>type</code>, <code>hotkey</code>, <code>screenshot</code>, <code>run</code>, <code>plugin_list</code>, <code>plugin_run</code>.</p>
 </section>
 
 <!-- PLATFORMS -->
