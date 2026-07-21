@@ -89,6 +89,21 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
   the project icon so macOS permission panes show the guiport logo.
 
 ### Fixed
+- **`screenshot --window <title>` captured the whole desktop instead of the
+  window.** The target was only resolved when `--app` was also passed, so
+  `--window` alone fell through to the full virtual-desktop path — callers got a
+  valid PNG, just of everything, including whatever happened to be covering the
+  window they asked for. `--window` now resolves a target on its own (title-only
+  resolution already existed in every adapter).
+- **Windows: per-window capture picked an arbitrary window of the process.**
+  `captureWindow` ignored the resolved `windowTitleHint` and took the *first
+  visible* top-level window for the pid, a coin flip for multi-window apps like
+  Teams. It now prefers the best title match, falls back to the largest window,
+  and skips minimised/zero-area windows (which `PrintWindow` renders blank).
+- **Windows: a contaminated capture no longer claims to be a clean one.** When
+  `PrintWindow` fails, capture falls back to `BitBlt`, which copies screen pixels
+  and therefore includes anything overlapping the window. That result is now
+  reported as `scope: "window-bitblt"` so callers can tell the two apart.
 - **`brew upgrade guiport` no longer fails with `Errno::ENOENT - guiport.app`.**
   The macOS release tarball shipped `guiport.app` as its sole top-level entry, so
   Homebrew auto-descended into the bundle when staging and the formula's
