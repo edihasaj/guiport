@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 import GuiportCore
 
 /// Bridges synthetic input from a non-GUI (Background) launchd session into the
@@ -14,9 +15,12 @@ import GuiportCore
 /// (resolving the element, computing the click point — all read-only and
 /// session-agnostic) and forwards only the final low-level event over a Unix
 /// socket. The daemon, being in Aqua, posts it where it lands.
+/// Thrown internally to short-circuit an overlay-only request to a plain "ok".
+private struct EarlyOK: Error {}
+
 public enum SessionBridge {
     /// Socket the Aqua daemon listens on and the Background CLI dials.
-    static let socketPath: String =
+    public static let socketPath: String =
         (NSHomeDirectory() as NSString).appendingPathComponent(".guiport/agent.sock")
 
     /// True inside the daemon process itself — set via env so forwarded events
@@ -47,6 +51,20 @@ public enum SessionBridge {
         if isDaemon { return false }
         if hasGraphicAccess { return false }
         return FileManager.default.fileExists(atPath: socketPath)
+    }
+
+    /// Tell the Aqua overlay daemon that guiport just acted on screen, so it can
+    /// show the glow. Best-effort and non-fatal: used by processes that post
+    /// input *directly* (they have graphic access) and therefore don't forward a
+    /// real op the daemon would otherwise see. No-op inside the daemon itself
+    /// (it notes activity locally) to avoid dialling its own socket mid-request.
+    public static func pingActivity(kind: String, point: CGPoint?) {
+        if isDaemon { return }
+        if shouldForward() { return } // the forwarded op already drives the overlay
+        guard FileManager.default.fileExists(atPath: socketPath) else { return }
+        var payload: [String: Any] = ["op": "activity", "kind": kind]
+        if let point { payload["x"] = Double(point.x); payload["y"] = Double(point.y) }
+        try? send(payload)
     }
 
     /// Human-readable reason input can't be delivered, for error hints.
@@ -156,12 +174,27 @@ public enum SessionBridge {
         }
 
         FileHandle.standardError.write(Data("[guiport] agent-daemon listening on \(socketPath)\n".utf8))
-        while true {
-            let client = accept(fd, nil, nil)
-            if client < 0 { continue }
-            handleClient(client)
-            close(client)
+
+        // Clear any stale Stop signal left by a previous run/crash so the daemon
+        // starts in a clean, actionable state.
+        Cancellation.clear()
+
+        // The socket accept loop moves to a background thread so the main thread
+        // can host AppKit for the on-screen overlay (glow border, cursor halo,
+        // Stop pill). Overlay updates are marshalled back to main.
+        let acceptThread = Thread {
+            while true {
+                let client = accept(fd, nil, nil)
+                if client < 0 { continue }
+                handleClient(client)
+                close(client)
+            }
         }
+        acceptThread.name = "com.edihasaj.guiport.daemon.accept"
+        acceptThread.stackSize = 1 << 20
+        acceptThread.start()
+
+        OverlayHost.runMain()  // blocks forever, running the AppKit event loop
     }
 
     private static func handleClient(_ client: Int32) {
@@ -180,7 +213,23 @@ public enum SessionBridge {
             guard let op = try JSONSerialization.jsonObject(with: line) as? [String: Any] else {
                 throw GuiportError(code: "daemon_parse", message: "bad request")
             }
+            // Drive the on-screen overlay from every request (forwarded input and
+            // bare activity pings alike) so the glow tracks what guiport is doing.
+            let kind = (op["op"] as? String) ?? "activity"
+            let point: CGPoint? = {
+                if let x = op["x"] as? Double, let y = op["y"] as? Double { return CGPoint(x: x, y: y) }
+                return nil
+            }()
+            OverlayHost.noteActivity(kind: kind, point: point)
+
+            // An "activity" op is overlay-only — no input to post.
+            if kind == "activity" { throw EarlyOK() }
+
+            // Honour a Stop that landed between forwarding and execution.
+            try Cancellation.throwIfCancelled()
             try Input.executeForwardedOp(op)
+        } catch is EarlyOK {
+            // overlay-only op; reply ok
         } catch let e as GuiportError {
             reply = ["ok": false, "error": e.message]
         } catch {

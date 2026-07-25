@@ -5,6 +5,21 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Added
+- **On-screen "GuiPort is controlling your screen" indicator + one-key/one-click
+  Stop (Codex-style, in the GuiPort amber theme).** While guiport drives the
+  machine, the Aqua input-agent daemon paints a pulsing amber glow around every
+  screen edge, a soft halo that tracks the cursor, and a small non-activating
+  pill at the top — so anyone watching knows guiport is acting, while keeping
+  full control of the screen. Pressing the pill's **Stop** button or the **ESC**
+  key halts guiport: it raises a shared Stop signal (`~/.guiport/cancel`) that
+  every input op — local or forwarded through the agent — checks first, so the
+  next `click`/`type`/`hotkey`/`run` step aborts with a clear `cancelled` error
+  that surfaces to the driving agent (Claude, Codex, a YAML replay) as a failed
+  tool call. The Stop is sticky for a short cool-down (`GUIPORT_CANCEL_WINDOW_MS`,
+  default 10s) so a whole burst halts, then auto-heals. New surface: `guiport
+  stop`, `guiport resume`, and `guiport overlay demo|status`. The overlay is
+  macOS-only (needs `guiport agent install`); the Stop signal itself is
+  cross-platform.
 - **Plugin / recipe system — reusable, app-specific flows without app logic in
   core.** Plugins live in a user directory (`~/.guiport/plugins/*.{yaml,yml}`,
   override via `GUIPORT_PLUGINS_DIR` or `--dir`), each targeting one app and

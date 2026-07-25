@@ -24,6 +24,7 @@ public enum SmartClick {
                              useAXPress: Bool = false,
                              mode: Mode = .auto,
                              scope: TreeScope = .auto) throws -> SmartClickResult {
+        try Cancellation.throwIfCancelled()
         let parsed = try Selector.parse(selector)
 
         // Try AX first — early-exit walk that stops at the first matching node

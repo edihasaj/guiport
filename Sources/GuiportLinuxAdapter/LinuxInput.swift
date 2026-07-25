@@ -10,6 +10,7 @@ import GuiportCore
 /// We surface that as a clear error if the daemon socket is missing.
 enum LinuxInput {
     static func clickAt(x: Double, y: Double, button: String, count: Int) throws -> InputResult {
+        try Cancellation.throwIfCancelled()
         let btn = mouseButton(button)
         switch LinuxSession.current {
         case .x11:
@@ -33,6 +34,7 @@ enum LinuxInput {
     }
 
     static func type(_ text: String, perCharDelayMs: Int) throws -> InputResult {
+        try Cancellation.throwIfCancelled()
         switch LinuxSession.current {
         case .x11:
             try Shell.require("xdotool", hint: "Install xdotool.")
@@ -57,6 +59,7 @@ enum LinuxInput {
     }
 
     static func hotkey(_ combo: String) throws -> InputResult {
+        try Cancellation.throwIfCancelled()
         let normalized = normalize(combo)
         switch LinuxSession.current {
         case .x11:

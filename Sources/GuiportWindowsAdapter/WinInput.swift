@@ -8,6 +8,7 @@ import GuiportCore
 /// we surface that as a clear error after the call returns 0.
 enum WinInput {
     static func clickAt(x: Double, y: Double, button: String, count: Int) throws -> InputResult {
+        try Cancellation.throwIfCancelled()
         try moveAbsolute(x: x, y: y)
         let (down, up) = mouseFlags(for: button)
         for _ in 0..<max(1, count) {
@@ -23,6 +24,7 @@ enum WinInput {
     }
 
     static func type(_ text: String, perCharDelayMs: Int) throws -> InputResult {
+        try Cancellation.throwIfCancelled()
         for ch in text.unicodeScalars {
             try sendUnicode(scalar: ch)
             if perCharDelayMs > 0 {
@@ -33,6 +35,7 @@ enum WinInput {
     }
 
     static func hotkey(_ combo: String) throws -> InputResult {
+        try Cancellation.throwIfCancelled()
         let parts = combo.lowercased()
             .split(separator: "+")
             .map { $0.trimmingCharacters(in: .whitespaces) }

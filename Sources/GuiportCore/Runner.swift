@@ -51,6 +51,7 @@ public enum Runner {
         for (i, raw) in steps.enumerated() {
             let started = Date()
             do {
+                try Cancellation.throwIfCancelled()
                 let label = try await execStep(raw, appName: appName, timeoutMs: defaultTimeoutMs)
                 results.append(.init(
                     action: label.action, passed: true,
@@ -101,6 +102,7 @@ public enum Runner {
         for (i, raw) in steps.enumerated() {
             let started = Date()
             do {
+                try Cancellation.throwIfCancelled()
                 let step = try await execStep(raw, appName: appName, timeoutMs: timeoutMs)
                 results.append(.init(
                     action: step.action, passed: true,

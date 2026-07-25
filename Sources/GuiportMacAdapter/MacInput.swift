@@ -9,9 +9,12 @@ enum Input {
 
     static func click(_ node: AXNode, app: AppTarget, button: String, count: Int, useAXPress: Bool) throws -> InputResult {
         try Doctor.ensureAccessibilityOrThrow()
+        try Cancellation.throwIfCancelled()
 
         if useAXPress {
             activateIfNeeded(app.pid)
+            SessionBridge.pingActivity(kind: "click",
+                point: node.bounds.map { CGPoint(x: $0.x + $0.width / 2, y: $0.y + $0.height / 2) })
             guard let element = try AXBridge.locate(in: app, id: node.id) else {
                 throw GuiportError(code: "stale_node", message: "could not relocate element id \(node.id)")
             }
@@ -61,6 +64,7 @@ enum Input {
 
     static func clickAt(x: Double, y: Double, button: String = "left", count: Int = 1) throws -> InputResult {
         try Doctor.ensureAccessibilityOrThrow()
+        try Cancellation.throwIfCancelled()
         let detail = try emitMouse(at: CGPoint(x: x, y: y), button: button, count: count, activatePid: nil)
         return InputResult(action: "click-at", ok: true, detail: detail, target: nil)
     }
@@ -72,6 +76,8 @@ enum Input {
 
     static func type(_ text: String, perCharDelayMs: Int, method: TypeMethod = .auto) throws -> InputResult {
         try Doctor.ensureAccessibilityOrThrow()
+        try Cancellation.throwIfCancelled()
+        SessionBridge.pingActivity(kind: "type", point: nil)
         if SessionBridge.shouldForward() {
             // Resolve in the executing (daemon) process, which owns the focus/screen.
             try SessionBridge.send(["op": "type", "text": text,
@@ -210,6 +216,8 @@ enum Input {
 
     static func hotkey(_ combo: String) throws -> InputResult {
         try Doctor.ensureAccessibilityOrThrow()
+        try Cancellation.throwIfCancelled()
+        SessionBridge.pingActivity(kind: "hotkey", point: nil)
         if SessionBridge.shouldForward() {
             try SessionBridge.send(["op": "hotkey", "combo": combo])
             return InputResult(action: "hotkey", ok: true, detail: "\(combo) (via agent)", target: nil)
@@ -259,6 +267,7 @@ enum Input {
     /// string for the InputResult. `activatePid`, when set and not already
     /// frontmost, raises that app first so the click lands on it.
     private static func emitMouse(at p: CGPoint, button: String, count: Int, activatePid: Int32?) throws -> String {
+        SessionBridge.pingActivity(kind: "mouse", point: p)
         if SessionBridge.shouldForward() {
             try SessionBridge.send([
                 "op": "mouse",

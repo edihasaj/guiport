@@ -237,6 +237,35 @@ Privacy & Security → Accessibility. A Developer-ID-signed build keeps that
 grant stable across `brew upgrade`. Then `guiport click/type/hotkey` from any
 background process lands on screen.
 
+## "Controlling your screen" indicator + Stop
+
+Whenever guiport acts on screen, the Aqua daemon shows a live indicator so you
+always know an agent is driving — and can take over instantly. In the GuiPort
+amber theme:
+
+- a pulsing glow around every screen edge,
+- a soft halo that tracks the cursor,
+- a small pill at the top: **GuiPort is controlling your screen · Stop ⎋**.
+
+You keep full control of the screen the whole time. To halt guiport, click the
+pill's **Stop** button or press **ESC**. Either raises a shared Stop signal that
+every input op checks first, so the next `click`/`type`/`hotkey`/`run` step
+aborts with a `cancelled` error — which the driving agent (Claude, Codex, a YAML
+replay) sees as a failed tool call and stops on. The Stop is sticky for a short
+cool-down (`GUIPORT_CANCEL_WINDOW_MS`, default `10000`) so a whole burst of
+queued actions halts, then auto-heals.
+
+```sh
+guiport stop            # raise the Stop signal from the CLI (same as the pill / ESC)
+guiport resume          # clear it and re-enable
+guiport overlay status  # is the overlay available? is guiport currently stopped?
+guiport overlay demo    # flash the indicator for a few seconds (to see it)
+```
+
+The indicator lives in the input-agent daemon, so it needs `guiport agent
+install`. It's macOS-only today; the Stop signal itself is cross-platform, so
+`guiport stop` halts input on every platform.
+
 ## Architecture
 
 - Pure Swift, single binary.
