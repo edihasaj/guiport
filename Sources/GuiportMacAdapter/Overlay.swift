@@ -116,7 +116,7 @@ final class OverlayController {
 
     private func buildPill() {
         let pill = StopPill { [weak self] in
-            self?.userRequestedStop(reason: "Stop button")
+            self?.userRequestedStop(reason: "Stop pressed")
         }
         pill.level = overlayLevel()
         pill.collectionBehavior = overlayBehavior()
@@ -127,9 +127,12 @@ final class OverlayController {
     private func positionPill(_ pill: NSWindow) {
         guard let screen = NSScreen.main else { return }
         let size = pill.frame.size
-        let x = screen.frame.midX - size.width / 2
-        // Just below the top edge / menu bar.
-        let y = screen.frame.maxY - size.height - 12
+        // Sit just *below* the menu bar (visibleFrame excludes it) so the chip
+        // never covers the menu bar, and keep it small so it barely grazes the
+        // window title / tab strip underneath.
+        let vf = screen.visibleFrame
+        let x = vf.midX - size.width / 2
+        let y = vf.maxY - size.height - 6
         pill.setFrameOrigin(NSPoint(x: x, y: y))
     }
 
@@ -312,17 +315,17 @@ private final class CursorGlowView: NSView {
 
 // MARK: - Stop pill
 
-/// A small, non-activating panel: pulsing dot + "GuiPort is controlling your
-/// screen" + a Stop button. Clicking Stop (or pressing ESC) halts guiport.
+/// A small, non-activating chip that sits just below the menu bar: a pulsing
+/// amber dot + "Stop guiport" + an `esc` keycap. Deliberately compact so it
+/// barely grazes the window content underneath. Clicking anywhere on the chip
+/// (or pressing ESC) halts guiport — the whole chip is the hit target, so it
+/// works for a real click and a programmatic one alike.
 private final class StopPill: NSPanel {
-    private let onStop: () -> Void
-    private let dot = CALayer()
-    private let label = NSTextField(labelWithString: "")
-    private let button = NSButton()
+    private let chip: ChipView
 
     init(onStop: @escaping () -> Void) {
-        self.onStop = onStop
-        let size = NSSize(width: 356, height: 40)
+        let size = NSSize(width: 158, height: 28)
+        chip = ChipView(frame: NSRect(origin: .zero, size: size), onStop: onStop)
         super.init(contentRect: NSRect(origin: .zero, size: size),
                    styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: false)
@@ -333,96 +336,85 @@ private final class StopPill: NSPanel {
         backgroundColor = .clear
         hasShadow = true
         alphaValue = 0
-
-        let content = PillBackgroundView(frame: NSRect(origin: .zero, size: size))
-        contentView = content
-
-        // Pulsing status dot.
-        dot.backgroundColor = OverlayTheme.amber.cgColor
-        dot.frame = CGRect(x: 16, y: size.height / 2 - 4, width: 8, height: 8)
-        dot.cornerRadius = 4
-        dot.shadowColor = OverlayTheme.amber.cgColor
-        dot.shadowRadius = 5
-        dot.shadowOpacity = 0.9
-        dot.shadowOffset = .zero
-        content.layer?.addSublayer(dot)
-        let dotPulse = CABasicAnimation(keyPath: "opacity")
-        dotPulse.fromValue = 0.35; dotPulse.toValue = 1.0
-        dotPulse.duration = 0.9; dotPulse.autoreverses = true; dotPulse.repeatCount = .infinity
-        dot.add(dotPulse, forKey: "blink")
-
-        // Status label.
-        label.stringValue = "GuiPort is controlling your screen"
-        label.font = .systemFont(ofSize: 12.5, weight: .medium)
-        label.textColor = OverlayTheme.bone
-        label.isBezeled = false
-        label.drawsBackground = false
-        label.isEditable = false
-        label.frame = NSRect(x: 34, y: 0, width: 220, height: size.height)
-        label.alignment = .left
-        label.cell?.usesSingleLineMode = true
-        (label.cell as? NSTextFieldCell)?.lineBreakMode = .byTruncatingTail
-        content.addSubview(label)
-
-        // Stop button.
-        configureButton(size: size)
-        content.addSubview(button)
+        contentView = chip
     }
-
-    private func configureButton(size: NSSize) {
-        button.title = ""
-        button.isBordered = false
-        button.wantsLayer = true
-        button.bezelStyle = .regularSquare
-        button.frame = NSRect(x: size.width - 96, y: 6, width: 80, height: 28)
-        button.layer?.backgroundColor = OverlayTheme.amber.cgColor
-        button.layer?.cornerRadius = 8
-        let title = NSAttributedString(string: "Stop  ⎋", attributes: [
-            .foregroundColor: OverlayTheme.navy,
-            .font: NSFont.systemFont(ofSize: 12.5, weight: .bold),
-        ])
-        button.attributedTitle = title
-        button.target = self
-        button.action = #selector(stopTapped)
-        // Fire the instant Stop is pressed — snappier for the user and robust to
-        // programmatic clicks (whose down/up can arrive too fast for the default
-        // mouse-up tracking loop to register).
-        button.cell?.sendAction(on: .leftMouseDown)
-    }
-
-    @objc private func stopTapped() { onStop() }
 
     override var canBecomeKey: Bool { true }
-
-    /// Reset to the live "controlling" appearance after a prior "Stopped" state.
-    func reset() {
-        label.stringValue = "GuiPort is controlling your screen"
-        label.textColor = OverlayTheme.bone
-        dot.backgroundColor = OverlayTheme.amber.cgColor
-        button.isHidden = false
-    }
-
-    /// Acknowledge a Stop press before the overlay fades.
-    func showStopped() {
-        label.stringValue = "Stopped GuiPort"
-        dot.backgroundColor = OverlayTheme.bone.cgColor
-        button.isHidden = true
-    }
+    func reset() { chip.reset() }
+    func showStopped() { chip.showStopped() }
 }
 
-/// Rounded navy background with a thin amber border for the pill.
-private final class PillBackgroundView: NSView {
-    override init(frame frameRect: NSRect) {
+/// The chip's content: rounded navy background, thin amber border, pulsing dot,
+/// "Stop guiport" label, and an `esc` keycap. Handles its own click.
+private final class ChipView: NSView {
+    private let onStop: () -> Void
+    private let dot = CALayer()
+    private let label = NSTextField(labelWithString: "")
+    private let keycap = NSTextField(labelWithString: "esc")
+
+    init(frame frameRect: NSRect, onStop: @escaping () -> Void) {
+        self.onStop = onStop
         super.init(frame: frameRect)
         wantsLayer = true
-        layer?.backgroundColor = OverlayTheme.navy.withAlphaComponent(0.94).cgColor
+        layer?.backgroundColor = OverlayTheme.navy.withAlphaComponent(0.95).cgColor
         layer?.cornerRadius = frameRect.height / 2
         layer?.borderWidth = 1
-        layer?.borderColor = OverlayTheme.amber.withAlphaComponent(0.55).cgColor
+        layer?.borderColor = OverlayTheme.amber.withAlphaComponent(0.6).cgColor
         layer?.masksToBounds = true
+
+        // Pulsing amber status dot.
+        dot.backgroundColor = OverlayTheme.amber.cgColor
+        dot.frame = CGRect(x: 12, y: frameRect.height / 2 - 3, width: 6, height: 6)
+        dot.cornerRadius = 3
+        dot.shadowColor = OverlayTheme.amber.cgColor
+        dot.shadowRadius = 4; dot.shadowOpacity = 0.9; dot.shadowOffset = .zero
+        layer?.addSublayer(dot)
+        let blink = CABasicAnimation(keyPath: "opacity")
+        blink.fromValue = 0.35; blink.toValue = 1.0
+        blink.duration = 0.9; blink.autoreverses = true; blink.repeatCount = .infinity
+        dot.add(blink, forKey: "blink")
+
+        // "Stop guiport" label.
+        label.stringValue = "Stop guiport"
+        label.font = .systemFont(ofSize: 12, weight: .semibold)
+        label.textColor = OverlayTheme.bone
+        label.isBezeled = false; label.drawsBackground = false; label.isEditable = false
+        label.frame = NSRect(x: 26, y: 0, width: 92, height: frameRect.height)
+        label.alignment = .left
+        addSubview(label)
+
+        // Small `esc` keycap on the right hints the keyboard shortcut.
+        keycap.font = .systemFont(ofSize: 9.5, weight: .bold)
+        keycap.textColor = OverlayTheme.amber2
+        keycap.isBezeled = false; keycap.drawsBackground = false; keycap.isEditable = false
+        keycap.alignment = .center
+        keycap.wantsLayer = true
+        keycap.layer?.borderColor = OverlayTheme.amber.withAlphaComponent(0.7).cgColor
+        keycap.layer?.borderWidth = 1
+        keycap.layer?.cornerRadius = 5
+        keycap.frame = NSRect(x: frameRect.width - 44, y: 6, width: 30, height: 16)
+        addSubview(keycap)
     }
+
     required init?(coder: NSCoder) { nil }
     override var isFlipped: Bool { false }
+
+    // Whole chip is the Stop control — fire on mouse-down so it's snappy and
+    // works for programmatic clicks whose down/up arrive too fast for tracking.
+    override func mouseDown(with event: NSEvent) { onStop() }
+
+    func reset() {
+        label.stringValue = "Stop guiport"
+        label.textColor = OverlayTheme.bone
+        dot.backgroundColor = OverlayTheme.amber.cgColor
+        keycap.isHidden = false
+    }
+
+    func showStopped() {
+        label.stringValue = "Stopped"
+        dot.backgroundColor = OverlayTheme.bone.cgColor
+        keycap.isHidden = true
+    }
 }
 
 // MARK: - Daemon host

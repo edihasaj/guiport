@@ -245,10 +245,10 @@ amber theme:
 
 - a pulsing glow around every screen edge,
 - a soft halo that tracks the cursor,
-- a small pill at the top: **GuiPort is controlling your screen · Stop ⎋**.
+- a small chip just below the menu bar: **● Stop guiport `esc`**.
 
 You keep full control of the screen the whole time. To halt guiport, click the
-pill's **Stop** button or press **ESC**. Either raises a shared Stop signal that
+**Stop** chip or press **ESC**. Either raises a shared Stop signal that
 every input op checks first, so the next `click`/`type`/`hotkey`/`run` step
 aborts with a `cancelled` error — which the driving agent (Claude, Codex, a YAML
 replay) sees as a failed tool call and stops on. The Stop is sticky for a short
