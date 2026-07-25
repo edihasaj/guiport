@@ -258,13 +258,20 @@ queued actions halts, then auto-heals.
 ```sh
 guiport stop            # raise the Stop signal from the CLI (same as the pill / ESC)
 guiport resume          # clear it and re-enable
-guiport overlay status  # is the overlay available? is guiport currently stopped?
+guiport overlay status  # is a daemon running right now? is guiport stopped?
 guiport overlay demo    # flash the indicator for a few seconds (to see it)
 ```
 
-The indicator lives in the input-agent daemon, so it needs `guiport agent
-install`. It's macOS-only today; the Stop signal itself is cross-platform, so
-`guiport stop` halts input on every platform.
+**No login item.** When you run guiport from a Terminal in your GUI session,
+the overlay host is **spawned on demand** the first time guiport touches the
+screen and **idle-exits** after a few minutes (tune with
+`GUIPORT_DAEMON_IDLE_MS`) — it only runs while guiport is actually driving,
+never as a background startup process. It's macOS-only; the Stop signal itself
+is cross-platform, so `guiport stop` halts input on every platform.
+
+(The persistent `guiport agent install` LaunchAgent is a *separate*, opt-in
+thing — only needed to let a **background-session** agent, e.g. over SSH,
+deliver clicks at all. GUI-session use needs neither it nor any install.)
 
 ## Architecture
 

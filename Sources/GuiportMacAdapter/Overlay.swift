@@ -345,12 +345,13 @@ private final class StopPill: NSPanel {
 }
 
 /// The chip's content: rounded navy background, thin amber border, pulsing dot,
-/// "Stop guiport" label, and an `esc` keycap. Handles its own click.
+/// "Stop guiport" label, and an `esc` keycap. The label + keycap are drawn with
+/// computed metrics so everything is precisely vertically centred. Handles its
+/// own click.
 private final class ChipView: NSView {
     private let onStop: () -> Void
     private let dot = CALayer()
-    private let label = NSTextField(labelWithString: "")
-    private let keycap = NSTextField(labelWithString: "esc")
+    private var stopped = false
 
     init(frame frameRect: NSRect, onStop: @escaping () -> Void) {
         self.onStop = onStop
@@ -362,7 +363,7 @@ private final class ChipView: NSView {
         layer?.borderColor = OverlayTheme.amber.withAlphaComponent(0.6).cgColor
         layer?.masksToBounds = true
 
-        // Pulsing amber status dot.
+        // Pulsing amber status dot, vertically centred.
         dot.backgroundColor = OverlayTheme.amber.cgColor
         dot.frame = CGRect(x: 12, y: frameRect.height / 2 - 3, width: 6, height: 6)
         dot.cornerRadius = 3
@@ -373,27 +374,6 @@ private final class ChipView: NSView {
         blink.fromValue = 0.35; blink.toValue = 1.0
         blink.duration = 0.9; blink.autoreverses = true; blink.repeatCount = .infinity
         dot.add(blink, forKey: "blink")
-
-        // "Stop guiport" label.
-        label.stringValue = "Stop guiport"
-        label.font = .systemFont(ofSize: 12, weight: .semibold)
-        label.textColor = OverlayTheme.bone
-        label.isBezeled = false; label.drawsBackground = false; label.isEditable = false
-        label.frame = NSRect(x: 26, y: 0, width: 92, height: frameRect.height)
-        label.alignment = .left
-        addSubview(label)
-
-        // Small `esc` keycap on the right hints the keyboard shortcut.
-        keycap.font = .systemFont(ofSize: 9.5, weight: .bold)
-        keycap.textColor = OverlayTheme.amber2
-        keycap.isBezeled = false; keycap.drawsBackground = false; keycap.isEditable = false
-        keycap.alignment = .center
-        keycap.wantsLayer = true
-        keycap.layer?.borderColor = OverlayTheme.amber.withAlphaComponent(0.7).cgColor
-        keycap.layer?.borderWidth = 1
-        keycap.layer?.cornerRadius = 5
-        keycap.frame = NSRect(x: frameRect.width - 44, y: 6, width: 30, height: 16)
-        addSubview(keycap)
     }
 
     required init?(coder: NSCoder) { nil }
@@ -403,17 +383,32 @@ private final class ChipView: NSView {
     // works for programmatic clicks whose down/up arrive too fast for tracking.
     override func mouseDown(with event: NSEvent) { onStop() }
 
-    func reset() {
-        label.stringValue = "Stop guiport"
-        label.textColor = OverlayTheme.bone
-        dot.backgroundColor = OverlayTheme.amber.cgColor
-        keycap.isHidden = false
-    }
+    func reset() { stopped = false; dot.backgroundColor = OverlayTheme.amber.cgColor; needsDisplay = true }
+    func showStopped() { stopped = true; dot.backgroundColor = OverlayTheme.bone.cgColor; needsDisplay = true }
 
-    func showStopped() {
-        label.stringValue = "Stopped"
-        dot.backgroundColor = OverlayTheme.bone.cgColor
-        keycap.isHidden = true
+    override func draw(_ dirtyRect: NSRect) {
+        // Label — vertically centred by its own text metrics.
+        let font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        let label = NSAttributedString(string: stopped ? "Stopped" : "Stop guiport",
+                                       attributes: [.font: font, .foregroundColor: OverlayTheme.bone])
+        let ls = label.size()
+        label.draw(at: CGPoint(x: 26, y: (bounds.height - ls.height) / 2))
+
+        guard !stopped else { return }
+
+        // `esc` keycap — box centred vertically, text centred inside the box.
+        let capW: CGFloat = 30, capH: CGFloat = 16
+        let cap = NSRect(x: bounds.width - capW - 12, y: (bounds.height - capH) / 2, width: capW, height: capH)
+        let box = NSBezierPath(roundedRect: cap, xRadius: 5, yRadius: 5)
+        box.lineWidth = 1
+        OverlayTheme.amber.withAlphaComponent(0.7).setStroke()
+        box.stroke()
+        let capText = NSAttributedString(string: "esc", attributes: [
+            .font: NSFont.systemFont(ofSize: 9.5, weight: .bold),
+            .foregroundColor: OverlayTheme.amber2,
+        ])
+        let cs = capText.size()
+        capText.draw(at: CGPoint(x: cap.midX - cs.width / 2, y: cap.midY - cs.height / 2))
     }
 }
 
@@ -450,18 +445,54 @@ enum MainThreadDispatch {
 }
 
 public enum OverlayHost {
-    public static func runMain() {
-        odbg("runMain mainThread=\(Thread.isMainThread)")
+    public static func runMain(autospawn: Bool = false) {
+        odbg("runMain mainThread=\(Thread.isMainThread) autospawn=\(autospawn)")
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)  // no Dock icon, no menu bar entry
         _ = OverlayController.shared          // create early so ESC monitors install
+        // An auto-spawned daemon (no LaunchAgent) idle-exits so it never lingers
+        // as a background process — it only lives while guiport is driving.
+        if autospawn {
+            let ms = Int(ProcessInfo.processInfo.environment["GUIPORT_DAEMON_IDLE_MS"] ?? "") ?? 300_000
+            // runMain is invoked on the main thread (the daemon guarantees it).
+            if ms > 0 { MainActor.assumeIsolated { DaemonIdleExit.shared.start(idle: TimeInterval(ms) / 1000) } }
+        }
         app.run()
     }
 
     /// Note activity from off the main thread (the socket accept loop).
     public static func noteActivity(kind: String, point: CGPoint?) {
         MainThreadDispatch.async {
+            DaemonIdleExit.shared.touch()
             OverlayController.shared.noteActivity(kind: kind, point: point)
+        }
+    }
+}
+
+/// Idle-exit for an auto-spawned daemon: quit after `idle` seconds without a
+/// single request, so the overlay host never outstays guiport's actual use.
+/// Disabled unless `start` is called (LaunchAgent daemons keep running).
+@MainActor
+final class DaemonIdleExit {
+    static let shared = DaemonIdleExit()
+    private var timer: Timer?
+    private var idle: TimeInterval = 300
+    private var enabled = false
+
+    func start(idle: TimeInterval) {
+        enabled = true
+        self.idle = idle
+        touch()
+    }
+
+    func touch() {
+        guard enabled else { return }
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: idle, repeats: false) { _ in
+            MainActor.assumeIsolated {
+                odbg("idle-exit after \(Int(DaemonIdleExit.shared.idle))s idle")
+                exit(0)
+            }
         }
     }
 }

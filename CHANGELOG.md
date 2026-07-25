@@ -18,8 +18,13 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
   tool call. The Stop is sticky for a short cool-down (`GUIPORT_CANCEL_WINDOW_MS`,
   default 10s) so a whole burst halts, then auto-heals. New surface: `guiport
   stop`, `guiport resume`, and `guiport overlay demo|status`. The overlay is
-  macOS-only (needs `guiport agent install`); the Stop signal itself is
-  cross-platform.
+  macOS-only; the Stop signal itself is cross-platform. **No login item**: for
+  GUI-session use the overlay host is auto-spawned on demand (detached, single
+  instance via an flock) the first time guiport touches the screen and
+  idle-exits after a few minutes (`GUIPORT_DAEMON_IDLE_MS`, default 5m) — it
+  only runs while guiport is actually driving. The persistent `guiport agent
+  install` LaunchAgent stays opt-in, only for background-session (e.g. SSH)
+  forwarding.
 - **Plugin / recipe system — reusable, app-specific flows without app logic in
   core.** Plugins live in a user directory (`~/.guiport/plugins/*.{yaml,yml}`,
   override via `GUIPORT_PLUGINS_DIR` or `--dir`), each targeting one app and

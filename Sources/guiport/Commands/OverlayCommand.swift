@@ -35,14 +35,8 @@ struct OverlayCommand: AsyncParsableCommand {
 
         func run() async throws {
             #if canImport(GuiportMacAdapter)
-            let socket = FileManager.default.fileExists(atPath: SessionBridge.socketPath)
-            guard socket else {
-                throw GuiportError(
-                    code: "overlay_no_daemon",
-                    message: "the Aqua agent-daemon isn't running, so there's nothing to show the overlay",
-                    hint: "install it once from a Terminal in the logged-in GUI session: `guiport agent install`")
-            }
-            // Refresh faster than the daemon's idle fade so the glow stays lit.
+            // The first ping auto-spawns the overlay daemon in this GUI session if
+            // none is running; refreshing faster than the idle fade keeps it lit.
             let deadline = Date().addingTimeInterval(seconds)
             while Date() < deadline {
                 SessionBridge.pingActivity(kind: "mouse", point: nil)
@@ -63,13 +57,17 @@ struct OverlayCommand: AsyncParsableCommand {
 
         func run() async throws {
             #if canImport(GuiportMacAdapter)
-            let socket = FileManager.default.fileExists(atPath: SessionBridge.socketPath)
+            let running = SessionBridge.isDaemonRunning()
+            let available = true
             #else
-            let socket = false
+            let running = false
+            let available = false  // overlay is macOS-only
             #endif
             OverlayCommand.emit([
-                "daemon_socket": socket,
-                "overlay_available": socket,
+                // The overlay is available on demand (auto-spawns while guiport
+                // drives the screen); `daemon_running` is the live state right now.
+                "daemon_running": running,
+                "overlay_available": available,
                 "stopped": Cancellation.isCancelled(),
                 "stop_reason": Cancellation.activeReason() as Any,
             ])

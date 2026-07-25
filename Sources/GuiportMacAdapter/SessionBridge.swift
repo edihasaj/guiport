@@ -58,13 +58,83 @@ public enum SessionBridge {
     /// input *directly* (they have graphic access) and therefore don't forward a
     /// real op the daemon would otherwise see. No-op inside the daemon itself
     /// (it notes activity locally) to avoid dialling its own socket mid-request.
+    ///
+    /// On-demand: if no daemon is listening, spawn one **detached** in this GUI
+    /// session (idle-exits later). No LaunchAgent / login item needed — the
+    /// overlay only runs while guiport is actually driving the screen.
     public static func pingActivity(kind: String, point: CGPoint?) {
         if isDaemon { return }
         if shouldForward() { return } // the forwarded op already drives the overlay
-        guard FileManager.default.fileExists(atPath: socketPath) else { return }
         var payload: [String: Any] = ["op": "activity", "kind": kind]
         if let point { payload["x"] = Double(point.x); payload["y"] = Double(point.y) }
-        try? send(payload)
+        // Delivered to a live daemon? Done. Otherwise spawn one for next time.
+        if (try? send(payload)) != nil { return }
+        spawnOverlayDaemonDetached()
+    }
+
+    /// Path of the running guiport binary, so a spawned daemon is the same build.
+    private static func currentBinaryPath() -> String {
+        if let p = Bundle.main.executableURL?.resolvingSymlinksInPath().path { return p }
+        return URL(fileURLWithPath: CommandLine.arguments.first ?? "guiport")
+            .resolvingSymlinksInPath().path
+    }
+
+    static var guiportDir: String { (socketPath as NSString).deletingLastPathComponent }
+    static var logPath: String { (guiportDir as NSString).appendingPathComponent("agent.log") }
+
+    /// Throttle repeat spawns while a freshly-launched daemon is still coming up.
+    private static var lastSpawn = Date(timeIntervalSince1970: 0)
+
+    /// Launch `guiport agent-daemon` detached in this session to host the overlay.
+    /// Single-instance is enforced by the daemon itself (it bows out if another
+    /// already owns the socket), so an occasional double-spawn is harmless.
+    static func spawnOverlayDaemonDetached() {
+        guard hasGraphicAccess, !isDaemon else { return } // can only draw from a GUI session
+        if Date().timeIntervalSince(lastSpawn) < 3 { return }
+        lastSpawn = Date()
+
+        try? FileManager.default.createDirectory(
+            atPath: guiportDir, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700])
+        if !FileManager.default.fileExists(atPath: logPath) {
+            FileManager.default.createFile(atPath: logPath, contents: nil)
+        }
+
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: currentBinaryPath())
+        p.arguments = ["agent-daemon"]
+        var env = ProcessInfo.processInfo.environment
+        env["GUIPORT_DAEMON_AUTOSPAWN"] = "1"
+        p.environment = env
+        p.standardInput = FileHandle.nullDevice
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = (try? FileHandle(forWritingTo: URL(fileURLWithPath: logPath))) ?? FileHandle.nullDevice
+        try? p.run() // fire-and-forget; the daemon detaches itself (setsid) to outlive us
+    }
+
+    /// True when a daemon is currently accepting on the socket. A non-spawning
+    /// probe (unlike `pingActivity`), used by `overlay status` — the socket file
+    /// can linger after an idle-exit, so file existence alone isn't liveness.
+    public static func isDaemonRunning() -> Bool {
+        guard FileManager.default.fileExists(atPath: socketPath) else { return false }
+        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+        guard fd >= 0 else { return false }
+        defer { close(fd) }
+        var addr = sockaddr_un()
+        addr.sun_family = sa_family_t(AF_UNIX)
+        let pathBytes = Array(socketPath.utf8)
+        withUnsafeMutablePointer(to: &addr.sun_path) { raw in
+            raw.withMemoryRebound(to: CChar.self, capacity: 104) { dst in
+                for (i, b) in pathBytes.prefix(103).enumerated() { dst[i] = CChar(bitPattern: b) }
+                dst[min(pathBytes.count, 103)] = 0
+            }
+        }
+        let ok = withUnsafePointer(to: &addr) { ptr in
+            ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
+                connect(fd, sa, socklen_t(MemoryLayout<sockaddr_un>.size))
+            }
+        }
+        return ok == 0
     }
 
     /// Human-readable reason input can't be delivered, for error hints.
@@ -133,6 +203,31 @@ public enum SessionBridge {
     /// Run the input daemon: bind the socket, accept one op per connection, and
     /// execute it locally (this process is in Aqua, so events land). Blocks.
     public static func runDaemon() throws {
+        // When guiport auto-spawned us (no LaunchAgent), detach from the parent
+        // CLI's process group + controlling terminal so we outlive it, and ignore
+        // the SIGHUP its exit would otherwise send. The Aqua (Mach bootstrap /
+        // audit) session is inherited and unaffected by setsid, so we can still
+        // draw. LaunchAgent-started daemons don't set this and are unchanged.
+        let autospawn = ProcessInfo.processInfo.environment["GUIPORT_DAEMON_AUTOSPAWN"] == "1"
+        if autospawn {
+            setsid()
+            signal(SIGHUP, SIG_IGN)
+        }
+
+        // Single instance: hold an exclusive lock for our lifetime. If another
+        // daemon already holds it (or is mid-startup), bow out cleanly — this
+        // also closes the race where two auto-spawns unlink each other's socket.
+        try? FileManager.default.createDirectory(
+            atPath: guiportDir, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700])
+        let lockFD = open((guiportDir as NSString).appendingPathComponent("agent.lock"),
+                          O_CREAT | O_RDWR, 0o600)
+        if lockFD >= 0, flock(lockFD, LOCK_EX | LOCK_NB) != 0 {
+            FileHandle.standardError.write(Data("[guiport] agent-daemon: another instance is live; exiting\n".utf8))
+            exit(0)
+        }
+        // Intentionally keep `lockFD` open for the process lifetime (never closed).
+
         // Register for Accessibility so the daemon binary appears in System
         // Settings → Privacy → Accessibility and the user can grant it. The
         // daemon needs its OWN grant: launchd is its parent, so it can't
@@ -194,7 +289,7 @@ public enum SessionBridge {
         acceptThread.stackSize = 1 << 20
         acceptThread.start()
 
-        OverlayHost.runMain()  // blocks forever, running the AppKit event loop
+        OverlayHost.runMain(autospawn: autospawn)  // blocks forever, running the AppKit event loop
     }
 
     private static func handleClient(_ client: Int32) {
