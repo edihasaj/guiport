@@ -1,4 +1,5 @@
 #if os(Windows)
+import Dispatch
 import Foundation
 import WinSDK
 import GuiportCore
@@ -80,9 +81,31 @@ enum WinOCR {
         } catch {
             throw GuiportError(code: "ocr_failed", message: "could not launch PowerShell for OCR: \(error)")
         }
+        // Drain both pipes *before* waiting, and concurrently.
+        //
+        // Waiting first deadlocks: a pipe holds only a few tens of KB, so once
+        // the script has written that much the child blocks in its own write
+        // and `waitUntilExit()` never returns. OCR of a full desktop emits one
+        // tab-separated line per text run, and a busy Teams window clears that
+        // buffer easily — which is how two guiport processes came to be wedged
+        // at once, taking the caller down with them for as long as it waited.
+        //
+        // Concurrently, because draining stdout to EOF first has the same
+        // failure the other way round: a child that fills stderr meanwhile is
+        // blocked writing it, so it never closes stdout.
+        var outData = Data()
+        var errData = Data()
+        let group = DispatchGroup()
+        DispatchQueue.global().async(group: group) {
+            outData = outPipe.fileHandleForReading.readDataToEndOfFile()
+        }
+        DispatchQueue.global().async(group: group) {
+            errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+        }
+        group.wait()
         proc.waitUntilExit()
-        let out = String(data: outPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-        let errText = String(data: errPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let out = String(data: outData, encoding: .utf8) ?? ""
+        let errText = String(data: errData, encoding: .utf8) ?? ""
         if proc.terminationStatus != 0 {
             throw GuiportError(
                 code: "ocr_failed",

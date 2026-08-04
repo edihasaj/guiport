@@ -109,6 +109,15 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
   the project icon so macOS permission panes show the guiport logo.
 
 ### Fixed
+- **Windows: `find-text` / `click-text` could hang forever on a busy screen.**
+  `WinOCR` called `waitUntilExit()` before draining the OCR script's pipes. A
+  pipe holds only tens of KB, so once the script had written that much it
+  blocked in its own write and the wait never returned — guiport wedged, and
+  took its caller down with it for as long as that caller was willing to wait.
+  It needed a screen with enough text to fill the buffer, which is why it looked
+  intermittent; a full desktop capture over a busy window does it reliably. Both
+  pipes are now drained concurrently before waiting, so neither stream can block
+  the other.
 - **`screenshot --window <title>` captured the whole desktop instead of the
   window.** The target was only resolved when `--app` was also passed, so
   `--window` alone fell through to the full virtual-desktop path — callers got a
