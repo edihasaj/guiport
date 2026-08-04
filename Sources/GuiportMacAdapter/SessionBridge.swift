@@ -202,6 +202,7 @@ public enum SessionBridge {
 
     /// Run the input daemon: bind the socket, accept one op per connection, and
     /// execute it locally (this process is in Aqua, so events land). Blocks.
+    @MainActor
     public static func runDaemon() throws {
         // When guiport auto-spawned us (no LaunchAgent), detach from the parent
         // CLI's process group + controlling terminal so we outlive it, and ignore

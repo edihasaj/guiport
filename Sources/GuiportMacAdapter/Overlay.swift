@@ -165,10 +165,12 @@ final class OverlayController {
             cursorWindow?.animator().alphaValue = 0
             pill?.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
-            guard let self, !self.visible else { return }
-            for w in self.borderWindows { w.orderOut(nil) }
-            self.cursorWindow?.orderOut(nil)
-            self.pill?.orderOut(nil)
+            MainActor.assumeIsolated {
+                guard let self, !self.visible else { return }
+                for w in self.borderWindows { w.orderOut(nil) }
+                self.cursorWindow?.orderOut(nil)
+                self.pill?.orderOut(nil)
+            }
         })
     }
 
@@ -445,6 +447,7 @@ enum MainThreadDispatch {
 }
 
 public enum OverlayHost {
+    @MainActor
     public static func runMain(autospawn: Bool = false) {
         odbg("runMain mainThread=\(Thread.isMainThread) autospawn=\(autospawn)")
         let app = NSApplication.shared

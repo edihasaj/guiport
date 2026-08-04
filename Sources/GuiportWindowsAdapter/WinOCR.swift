@@ -1,5 +1,4 @@
 #if os(Windows)
-import Dispatch
 import Foundation
 import WinSDK
 import GuiportCore
@@ -72,38 +71,34 @@ enum WinOCR {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: powershellPath())
         proc.arguments = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-Path", png]
-        let outPipe = Pipe()
-        let errPipe = Pipe()
-        proc.standardOutput = outPipe
-        proc.standardError = errPipe
+        // Regular files cannot fill up and block the child like pipes can, and
+        // let us read both streams after exit without cross-task mutation.
+        let stdoutPath = tempFile(ext: "stdout")
+        let stderrPath = tempFile(ext: "stderr")
+        FileManager.default.createFile(atPath: stdoutPath, contents: nil)
+        FileManager.default.createFile(atPath: stderrPath, contents: nil)
+        guard let stdout = FileHandle(forUpdatingAtPath: stdoutPath),
+              let stderr = FileHandle(forUpdatingAtPath: stderrPath) else {
+            throw GuiportError(code: "ocr_failed", message: "could not create temporary OCR output files")
+        }
+        defer {
+            stdout.closeFile()
+            stderr.closeFile()
+            try? FileManager.default.removeItem(atPath: stdoutPath)
+            try? FileManager.default.removeItem(atPath: stderrPath)
+        }
+        proc.standardOutput = stdout
+        proc.standardError = stderr
         do {
             try proc.run()
         } catch {
             throw GuiportError(code: "ocr_failed", message: "could not launch PowerShell for OCR: \(error)")
         }
-        // Drain both pipes *before* waiting, and concurrently.
-        //
-        // Waiting first deadlocks: a pipe holds only a few tens of KB, so once
-        // the script has written that much the child blocks in its own write
-        // and `waitUntilExit()` never returns. OCR of a full desktop emits one
-        // tab-separated line per text run, and a busy Teams window clears that
-        // buffer easily — which is how two guiport processes came to be wedged
-        // at once, taking the caller down with them for as long as it waited.
-        //
-        // Concurrently, because draining stdout to EOF first has the same
-        // failure the other way round: a child that fills stderr meanwhile is
-        // blocked writing it, so it never closes stdout.
-        var outData = Data()
-        var errData = Data()
-        let group = DispatchGroup()
-        DispatchQueue.global().async(group: group) {
-            outData = outPipe.fileHandleForReading.readDataToEndOfFile()
-        }
-        DispatchQueue.global().async(group: group) {
-            errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-        }
-        group.wait()
         proc.waitUntilExit()
+        stdout.seek(toFileOffset: 0)
+        stderr.seek(toFileOffset: 0)
+        let outData = stdout.readDataToEndOfFile()
+        let errData = stderr.readDataToEndOfFile()
         let out = String(data: outData, encoding: .utf8) ?? ""
         let errText = String(data: errData, encoding: .utf8) ?? ""
         if proc.terminationStatus != 0 {

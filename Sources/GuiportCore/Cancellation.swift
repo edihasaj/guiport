@@ -19,11 +19,15 @@ import Foundation
 public enum Cancellation {
     /// `~/.guiport/cancel` — the presence + freshness of this file is the signal.
     public static var flagPath: String {
-        (guiportDir as NSString).appendingPathComponent("cancel")
+        flagURL.path
     }
 
     static var guiportDir: String {
         (NSHomeDirectory() as NSString).appendingPathComponent(".guiport")
+    }
+
+    private static var flagURL: URL {
+        URL(fileURLWithPath: guiportDir).appendingPathComponent("cancel")
     }
 
     /// How long a Stop stays in effect before auto-healing, in milliseconds.
@@ -36,32 +40,45 @@ public enum Cancellation {
 
     /// Record a Stop. Called by the overlay (daemon) and by `guiport stop`.
     public static func requestCancel(reason: String) {
+        requestCancel(reason: reason, at: flagURL, nowMs: currentTimeMs)
+    }
+
+    /// Internal dependency-injected form used by deterministic, parallel tests.
+    static func requestCancel(reason: String, at flagURL: URL, nowMs: Int) {
         try? FileManager.default.createDirectory(
-            atPath: guiportDir, withIntermediateDirectories: true,
+            at: flagURL.deletingLastPathComponent(), withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700])
         let payload: [String: Any] = [
             "reason": reason,
-            "ts": Int(Date().timeIntervalSince1970 * 1000),
+            "ts": nowMs,
         ]
         if let data = try? JSONSerialization.data(withJSONObject: payload) {
-            try? data.write(to: URL(fileURLWithPath: flagPath))
+            try? data.write(to: flagURL)
         }
     }
 
     /// Clear any Stop immediately. Called by `guiport resume` and on daemon start.
     public static func clear() {
-        try? FileManager.default.removeItem(atPath: flagPath)
+        clear(at: flagURL)
+    }
+
+    static func clear(at flagURL: URL) {
+        try? FileManager.default.removeItem(at: flagURL)
     }
 
     /// The active Stop reason, or nil when guiport is free to act. Auto-clears an
     /// expired flag as a side effect so callers never observe a stale signal.
     public static func activeReason() -> String? {
-        guard let data = FileManager.default.contents(atPath: flagPath) else { return nil }
+        activeReason(at: flagURL, windowMs: windowMs, nowMs: currentTimeMs)
+    }
+
+    static func activeReason(at flagURL: URL, windowMs: Int, nowMs: Int) -> String? {
+        guard let data = FileManager.default.contents(atPath: flagURL.path) else { return nil }
         let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
         let ts = (obj?["ts"] as? Int) ?? 0
-        let ageMs = Int(Date().timeIntervalSince1970 * 1000) - ts
+        let ageMs = nowMs - ts
         if ageMs > windowMs {
-            clear()
+            clear(at: flagURL)
             return nil
         }
         return (obj?["reason"] as? String) ?? "stopped"
@@ -72,11 +89,19 @@ public enum Cancellation {
     /// Throw a `cancelled` error if a Stop is in effect. Call at the top of every
     /// input op so the abort lands before anything touches the user's screen.
     public static func throwIfCancelled() throws {
-        guard let reason = activeReason() else { return }
+        try throwIfCancelled(at: flagURL, windowMs: windowMs, nowMs: currentTimeMs)
+    }
+
+    static func throwIfCancelled(at flagURL: URL, windowMs: Int, nowMs: Int) throws {
+        guard let reason = activeReason(at: flagURL, windowMs: windowMs, nowMs: nowMs) else { return }
         throw GuiportError(
             code: "cancelled",
             message: "GuiPort was stopped by the user (\(reason)).",
             hint: "The user pressed Stop (or ESC) in the GuiPort overlay. Halt the current task. Run `guiport resume` to re-enable, or it clears automatically after the cool-down window."
         )
+    }
+
+    private static var currentTimeMs: Int {
+        Int(Date().timeIntervalSince1970 * 1000)
     }
 }
