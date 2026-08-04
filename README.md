@@ -20,7 +20,7 @@ A fast CLI/MCP control layer that lets agents like Claude, Codex, opencode, and 
 
 Available on macOS, Windows, and Linux. macOS is the primary target and runs the full stack — Accessibility tree first, screenshots as fallback.
 
-Windows ships a standalone binary (bundled Swift runtime, no toolchain needed) with input/screenshot/apps (Win32 SendInput, GDI BitBlt/PrintWindow → real PNG, EnumWindows) and `find-text` / `click-text` via WinRT OCR. UIA-backed tree/observe/find/click-by-selector is pending — it throws a clear `uia_pending` error today. Track progress under the [`windows`](https://github.com/edihasaj/guiport/issues?q=label%3Awindows) label.
+Windows ships a standalone binary (bundled Swift runtime, no toolchain needed) with input/screenshot/apps (Win32 SendInput, GDI BitBlt/PrintWindow → real PNG, EnumWindows), `find-text` / `click-text` via WinRT OCR, and `observe` / `tree` / `find` / `click` by selector via UI Automation. Roles are mapped onto the same names macOS uses, so `guiport click 'button[name="Send"]'` means the same thing on both — a script written against a Mac runs unchanged on Windows. `record` is still pending; track it under the [`windows`](https://github.com/edihasaj/guiport/issues?q=label%3Awindows) label.
 
 Linux ships a standalone binary (static Swift stdlib, glibc 2.35+) with the same shape: shell-out to `xdotool`/`wmctrl`/`scrot` on X11 and `ydotool`/`grim` on Wayland for input + screenshot, `/proc` + `wmctrl` for app enumeration. AT-SPI2-backed tree/observe/find and tesseract OCR throw `atspi_pending` / `ocr_pending` until those bindings land. Track under [`linux`](https://github.com/edihasaj/guiport/issues?q=label%3Alinux).
 
@@ -41,7 +41,7 @@ unit tests on each.
 | `hotkey` | ✅ | ✅ | ✅ |
 | `screenshot` (full screen) | ✅ | ✅² | ✅ |
 | `screenshot` (single window) | ✅ | ✅² | ✅ X11 · ⏳ Wayland |
-| `observe` / `tree` / `find` / `click` (by selector) | ✅ | ⏳ `uia_pending` | ⏳ `atspi_pending` |
+| `observe` / `tree` / `find` / `click` (by selector) | ✅ | ✅ ⁴ | ⏳ `atspi_pending` |
 | `find-text` / `click-text` (OCR) | ✅ | ✅³ | ⏳ `ocr_pending` |
 | `record` | ✅ | ⏳ `recorder_pending` | ⏳ `recorder_pending` |
 | `lifecycle` (launch / quit / kill / restart) | ✅ | ⏳ `unsupported` | ⏳ `unsupported` |
@@ -54,6 +54,16 @@ unit tests on each.
 rewritten to `.bmp`); PNG encoding via WIC is the follow-up.
 ³ Windows `find-text` / `click-text` are backed by WinRT OCR
 (`Windows.Media.Ocr`).
+
+⁴ Windows `observe` / `tree` / `find` / `click` are backed by UI Automation.
+Control types are mapped onto the macOS role names selectors normalise to
+(`Edit` → `AXTextField`, `Button` → `AXButton`, …), so one selector works on
+both platforms; the raw UIA type stays available as `subrole` for the cases
+where the platforms genuinely differ. `click --press` invokes through UIA
+rather than clicking pixels, which works even when the element is scrolled out
+of view. Apps that draw their own UI (some Electron/WebView2 surfaces) can
+expose little or nothing to UIA — `find-text` reads the same screen with OCR
+and does not depend on the tree.
 
 ## Why
 
@@ -87,7 +97,7 @@ survives upgrades. For bare `swift build` runs, `doctor --fix` also registers
 `~/Applications/guiport.app` so a real `guiport` app entry still appears instead
 of only the invoking terminal.
 
-Windows (input/screenshot/apps; UIA tree pending) — grab the prebuilt `guiport-<ver>-windows-x64.zip` from [releases](https://github.com/edihasaj/guiport/releases/latest), or install from source:
+Windows (input/screenshot/apps/UIA tree) — grab the prebuilt `guiport-<ver>-windows-x64.zip` from [releases](https://github.com/edihasaj/guiport/releases/latest), or install from source:
 
 ```powershell
 iwr -useb https://raw.githubusercontent.com/edihasaj/guiport/main/scripts/install.ps1 | iex
@@ -281,7 +291,7 @@ deliver clicks at all. GUI-session use needs neither it nor any install.)
 
 ## Non-goals (MVP)
 
-- No accessibility tree (UIA / AT-SPI2) on Windows/Linux yet — see the [support matrix](#support-matrix).
+- No accessibility tree (AT-SPI2) on Linux yet, and no `record` on Windows or Linux — see the [support matrix](#support-matrix).
 - No vision-first automation.
 - No autonomous Manus clone.
 - No background/session-0 automation.

@@ -3,9 +3,9 @@ import Foundation
 import WinSDK
 import GuiportCore
 
-/// Windows desktop adapter — Win32 SendInput, GDI BitBlt, EnumWindows.
-/// UIA-backed tree/observe/find are stubbed until COM bindings land
-/// (tracked under the `windows` label).
+/// Windows desktop adapter — Win32 SendInput, GDI BitBlt, EnumWindows, and
+/// UI Automation for `observe` / `tree` / `find` / selector `click` (see
+/// ``WinUIA``). `record` is still pending.
 public struct WindowsAdapter: DesktopAdapter {
     public init() {}
 
@@ -38,22 +38,42 @@ public struct WindowsAdapter: DesktopAdapter {
 
     public func windowCount(pid: Int32) -> Int { WinApps.windowCount(pid: pid) }
 
-    // MARK: - AX inspection (UIA pending)
+    // MARK: - AX inspection (UI Automation)
 
     public func observe(target: AppTarget) throws -> AXSummary {
-        throw uiaPending("observe")
+        let apps = (try? WinApps.list(onlyWithWindows: false)) ?? []
+        let info = apps.first { $0.pid == target.pid }
+            ?? AppInfo(name: target.name, bundleId: target.bundleId, pid: target.pid,
+                       active: false, windowCount: WinApps.windowCount(pid: target.pid))
+        return try WinUIA.observe(target: target, app: info)
     }
 
     public func tree(target: AppTarget, maxDepth: Int, includeHidden: Bool, scope: TreeScope) throws -> AXNode {
-        throw uiaPending("tree")
+        // `scope` is a macOS distinction (window vs app element vs the status-bar
+        // extras menu). Windows has one story: the top-level window's element.
+        try WinUIA.tree(target: target, maxDepth: maxDepth, includeHidden: includeHidden)
     }
 
     // MARK: - Input
 
     public func click(node: AXNode, app: AppTarget, button: String, count: Int, useAXPress: Bool) throws -> InputResult {
-        // Selector-based click depends on the UIA tree. Until that lands, callers
-        // can use `click-at <x> <y>` against a known coordinate or use OCR.
-        throw uiaPending("click by selector")
+        // Invoke through UIA when asked: an element can be scrolled out of view,
+        // or covered by another window, and still be perfectly invokable.
+        if useAXPress, (try? WinUIA.invoke(node: node, target: app)) == true {
+            return InputResult(action: "click", ok: true,
+                               detail: "invoked \(node.role) via UI Automation",
+                               target: node.name)
+        }
+        guard let b = node.bounds, b.width > 0, b.height > 0 else {
+            throw GuiportError(
+                code: "no_bounds",
+                message: "\(node.role) has no on-screen bounds to click",
+                hint: "It may be scrolled out of view. `--press` invokes it through "
+                    + "UI Automation instead, which does not need it visible."
+            )
+        }
+        return try WinInput.clickAt(x: b.x + b.width / 2, y: b.y + b.height / 2,
+                                    button: button, count: count)
     }
 
     public func clickAt(x: Double, y: Double, button: String, count: Int) throws -> InputResult {
@@ -95,12 +115,5 @@ public struct WindowsAdapter: DesktopAdapter {
         )
     }
 
-    private func uiaPending(_ what: String) -> GuiportError {
-        GuiportError(
-            code: "uia_pending",
-            message: "\(what) requires the UIA backend, which is not yet implemented on Windows",
-            hint: "Day-1 surface: apps, click-at, type, hotkey, screenshot. UIA tree tracked under the `windows` label."
-        )
-    }
 }
 #endif

@@ -5,6 +5,24 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Added
+- **Windows: the accessibility tree.** `observe`, `tree`, `find` and selector
+  `click` now work on Windows, backed by UI Automation (driven through
+  PowerShell's `System.Windows.Automation`, which ships with .NET Framework —
+  nothing to install). Until now these threw `uia_pending` and the only way to
+  reach a control on Windows was OCR plus a coordinate, which breaks the moment
+  a window moves, a pane collapses, or the same text appears twice on screen.
+
+  Control types are mapped onto the role names selectors already normalise to —
+  `Edit` → `AXTextField`, `Button` → `AXButton`, `ListItem` → `AXRow` — so
+  `guiport click 'button[name="Send"]'` means the same thing on macOS and on
+  Windows, and a script written against a Mac runs unchanged on a VM. The raw
+  UIA control type is kept as `subrole` for the cases where the platforms really
+  do differ. `click --press` invokes through UIA instead of clicking pixels,
+  which works even when the target is scrolled out of view or covered.
+
+  Apps that render their own UI can expose little to UIA (some Electron and
+  WebView2 surfaces do this); `find-text` reads the same screen with OCR and
+  does not depend on the tree, so the fallback is unchanged.
 - **On-screen "GuiPort is controlling your screen" indicator + one-key/one-click
   Stop (Codex-style, in the GuiPort amber theme).** While guiport drives the
   machine, the Aqua input-agent daemon paints a pulsing amber glow around every

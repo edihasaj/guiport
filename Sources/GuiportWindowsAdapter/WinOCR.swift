@@ -127,17 +127,10 @@ enum WinOCR {
         }
     }
 
-    private static func powershellPath() -> String {
-        let sys = ProcessInfo.processInfo.environment["SystemRoot"] ?? "C:\\Windows"
-        return "\(sys)\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
-    }
+    private static func powershellPath() -> String { WinPowerShell.path() }
 
     private static func tempFile(ext: String) -> String {
-        // Native backslash path (not URL.path, which yields forward slashes that
-        // trip WinRT's StorageFile path parsing).
-        let env = ProcessInfo.processInfo.environment
-        let tmp = env["TEMP"] ?? env["TMP"] ?? "C:\\Windows\\Temp"
-        return "\(tmp)\\guiport-ocr-\(UUID().uuidString).\(ext)"
+        WinPowerShell.tempFile(prefix: "ocr", ext: ext)
     }
 }
 
