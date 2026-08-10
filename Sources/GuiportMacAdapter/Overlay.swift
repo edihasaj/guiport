@@ -30,6 +30,7 @@ final class OverlayController {
     private var cursorTimer: Timer?
     private var idleTimer: Timer?
     private var escMonitors: [Any] = []
+    private var demoAnimationStart: TimeInterval?
     private var visible = false
 
     /// After this long with no activity, guiport is considered idle and the
@@ -45,6 +46,11 @@ final class OverlayController {
     func noteActivity(kind: String, point: CGPoint?) {
         // If the user just pressed Stop, honour the cool-down: don't re-show.
         if Cancellation.isCancelled() { return }
+        if kind == "demo" {
+            demoAnimationStart = demoAnimationStart ?? ProcessInfo.processInfo.systemUptime
+        } else {
+            demoAnimationStart = nil
+        }
         buildIfNeeded()
         show()
         resetIdleTimer()
@@ -200,7 +206,20 @@ final class OverlayController {
 
     private func updateCursorPosition() {
         guard let w = cursorWindow else { return }
-        let p = NSEvent.mouseLocation  // global screen coords, bottom-left origin
+        let p: CGPoint
+        if let started = demoAnimationStart, let screen = NSScreen.main {
+            // Demo mode must look alive even while the physical cursor is still.
+            // Orbit the halo around the usable screen without posting mouse events.
+            let elapsed = ProcessInfo.processInfo.systemUptime - started
+            let phase = elapsed / 7 * 2 * Double.pi
+            let frame = screen.visibleFrame.insetBy(dx: 150, dy: 110)
+            p = CGPoint(
+                x: frame.midX + cos(phase) * frame.width / 2,
+                y: frame.midY + sin(phase) * frame.height / 2
+            )
+        } else {
+            p = NSEvent.mouseLocation  // global screen coords, bottom-left origin
+        }
         let half = w.frame.size.width / 2
         w.setFrameOrigin(NSPoint(x: p.x - half, y: p.y - half))
     }

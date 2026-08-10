@@ -269,7 +269,8 @@ queued actions halts, then auto-heals.
 guiport stop            # raise the Stop signal from the CLI (same as the pill / ESC)
 guiport resume          # clear it and re-enable
 guiport overlay status  # is a daemon running right now? is guiport stopped?
-guiport overlay demo    # flash the indicator for a few seconds (to see it)
+guiport overlay demo    # animate the halo around the screen; Ctrl-C stops it
+guiport overlay demo --seconds 10  # timed mode for scripts and smoke tests
 ```
 
 **No login item.** When you run guiport from a Terminal in your GUI session,

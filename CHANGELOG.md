@@ -72,6 +72,10 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
   `unsupported`).
 
 ### Changed
+- `guiport overlay demo` now keeps the glow visible until interrupted and
+  animates its halo around the screen without moving the physical cursor,
+  instead of looking like it crashed after four seconds. Pass `--seconds
+  <duration>` for the previous timed behavior.
 - **Homebrew now ships a signed `guiport.app` and runs the CLI from inside it.**
   The release wraps the universal binary in a Developer-ID-signed `guiport.app`
   (`Contents/MacOS/guiport` + `.icns` + `Info.plist`) and the tap installs the

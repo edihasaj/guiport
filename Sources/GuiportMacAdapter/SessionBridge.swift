@@ -311,7 +311,8 @@ public enum SessionBridge {
             }
             // Drive the on-screen overlay from every request (forwarded input and
             // bare activity pings alike) so the glow tracks what guiport is doing.
-            let kind = (op["op"] as? String) ?? "activity"
+            let operation = (op["op"] as? String) ?? "activity"
+            let kind = (op["kind"] as? String) ?? operation
             let point: CGPoint? = {
                 if let x = op["x"] as? Double, let y = op["y"] as? Double { return CGPoint(x: x, y: y) }
                 return nil
@@ -319,7 +320,7 @@ public enum SessionBridge {
             OverlayHost.noteActivity(kind: kind, point: point)
 
             // An "activity" op is overlay-only — no input to post.
-            if kind == "activity" { throw EarlyOK() }
+            if operation == "activity" { throw EarlyOK() }
 
             // Honour a Stop that landed between forwarding and execution.
             try Cancellation.throwIfCancelled()

@@ -27,22 +27,30 @@ struct OverlayCommand: AsyncParsableCommand {
     /// verify the glow without driving a real app.
     struct Demo: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Flash the controlling-glow overlay for a few seconds (needs `guiport agent install`)."
+            abstract: "Keep the animated controlling-glow overlay visible until interrupted."
         )
 
-        @Option(name: .long, help: "How long to keep the overlay lit.")
-        var seconds: Double = 4
+        @Option(name: .long, help: "Stop after this many seconds instead of running until interrupted.")
+        var seconds: Double?
+
+        mutating func validate() throws {
+            if let seconds, seconds <= 0 {
+                throw ValidationError("--seconds must be greater than zero")
+            }
+        }
 
         func run() async throws {
             #if canImport(GuiportMacAdapter)
             // The first ping auto-spawns the overlay daemon in this GUI session if
             // none is running; refreshing faster than the idle fade keeps it lit.
-            let deadline = Date().addingTimeInterval(seconds)
-            while Date() < deadline {
-                SessionBridge.pingActivity(kind: "mouse", point: nil)
+            let deadline = seconds.map { Date().addingTimeInterval($0) }
+            while deadline.map({ Date() < $0 }) ?? true {
+                SessionBridge.pingActivity(kind: "demo", point: nil)
                 try await Task.sleep(nanoseconds: 300_000_000)
             }
-            OverlayCommand.emit(["ok": true, "shown_seconds": seconds])
+            if let seconds {
+                OverlayCommand.emit(["ok": true, "shown_seconds": seconds])
+            }
             #else
             throw GuiportError(code: "unsupported", message: "the overlay is macOS-only")
             #endif
