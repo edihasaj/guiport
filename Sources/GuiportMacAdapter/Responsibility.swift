@@ -17,7 +17,7 @@ import Foundation
 public enum Responsibility {
 
     /// Commands that actually touch Screen Recording. Only these pay the re-exec cost.
-    private static let screenCaptureCommands: Set<String> = ["screenshot", "record", "doctor"]
+    private static let screenCaptureCommands: Set<String> = ["screenshot", "stream", "record", "doctor"]
 
     private static let marker = "GUIPORT_DISCLAIMED"
 

@@ -93,9 +93,9 @@ guiport doctor         # all green when ready
 
 Homebrew ships (and runs the CLI from inside) a signed `guiport.app`, so macOS
 shows guiport's real logo in Accessibility and Screen Recording and the grant
-survives upgrades. For bare `swift build` runs, `doctor --fix` also registers
-`~/Applications/guiport.app` so a real `guiport` app entry still appears instead
-of only the invoking terminal.
+survives upgrades. For source builds, run `scripts/install-macos-app.sh` before
+granting permissions so macOS sees one stable app identity instead of a new
+bare binary per build.
 
 Windows (input/screenshot/apps/UIA tree) — grab the prebuilt `guiport-<ver>-windows-x64.zip` from [releases](https://github.com/edihasaj/guiport/releases/latest), or install from source:
 
@@ -122,6 +122,9 @@ guiport find --app "Safari" 'button[name="Save"]'    # match selector
 guiport click --app "Safari" 'button[name="Save"]'
 guiport type "hello"
 guiport screenshot --app "Safari" -o safari.png
+guiport stream                                      # live NDJSON frame feed; Ctrl-C stops
+guiport stream --app "Safari" --fps 2               # stream one window
+guiport stream --frames 1 -o /tmp/latest.png        # pull one fresh frame
 
 # Foreground an app without a click, guard keystrokes, and verify state:
 guiport activate --app "Safari"                      # raise it (no relaunch, no click)
@@ -141,6 +144,22 @@ guiport serve --mcp                                  # MCP server over stdio
 # Reusable, app-specific flows live in user plugins (never in core):
 guiport plugin list                                  # discover ~/.guiport/plugins
 guiport plugin run focus-and-type type-into text="hi" --app TextEdit
+```
+
+### Computer-use stream
+
+`guiport stream` keeps one screen session alive instead of repeatedly starting
+and stopping guiport. It writes newline-delimited JSON frame events to stdout
+and atomically refreshes one PNG path. An agent can let the stream run, read
+only the frame events it needs, inspect the latest image, act, and continue.
+The amber control indicator stays active for the same lifetime and follows the
+real cursor. Press Ctrl-C when finished, or use `--seconds` / `--frames` for a
+bounded session.
+
+```sh
+guiport stream --fps 2 -o artifacts/live.png
+guiport stream --app "Safari" --window "Start Page" -o artifacts/safari-live.png
+guiport stream --frames 1 -o /tmp/guiport-frame.png
 ```
 
 ## Plugins
@@ -218,8 +237,8 @@ OCR-found bounds drift across font/scale changes, so prefer AX selectors for rep
 - **Screen Recording** — required for `screenshot` and screenshot-on-failure artifacts.
 
 Run `guiport doctor` to check status and get System Settings deep links.
-Run `guiport doctor --fix` to trigger the missing permission prompts (and, for
-bare `swift build` runs, register `~/Applications/guiport.app`).
+Run `guiport doctor --fix` to trigger the missing permission prompts. For source
+builds, install the app wrapper with `scripts/install-macos-app.sh` first.
 
 ## Driving input from a background agent
 

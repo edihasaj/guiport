@@ -16,7 +16,7 @@ public struct MacAdapter: DesktopAdapter {
     public func promptAccessibility() -> Bool { AXBridge.promptAccessibilityIfNeeded() }
     public func hasScreenRecordingPermission() -> Bool { Screenshot.hasScreenRecordingPermission() }
     public func requestScreenRecordingPermission() -> Bool { Screenshot.requestScreenRecordingPermission() }
-    public func preparePermissionIdentity() -> String? { PermissionApp.installOrRefresh() }
+    public func preparePermissionIdentity() -> String? { PermissionApp.registerCurrentBundle() }
 
     public func enrolScreenRecording() {
         // Side-effecting: fetch ScreenCaptureKit shareable content so macOS enrols
@@ -114,115 +114,20 @@ public struct MacAdapter: DesktopAdapter {
 }
 
 enum PermissionApp {
-    static let bundleID = "com.edihasaj.guiport"
-
-    static func installOrRefresh() -> String? {
-        guard let executable = Bundle.main.executableURL else { return nil }
-        let fm = FileManager.default
-        let home = fm.homeDirectoryForCurrentUser
-        let app = home.appendingPathComponent("Applications/guiport.app", isDirectory: true)
-        let contents = app.appendingPathComponent("Contents", isDirectory: true)
-        let macOS = contents.appendingPathComponent("MacOS", isDirectory: true)
-        let resources = contents.appendingPathComponent("Resources", isDirectory: true)
-        let appExecutable = macOS.appendingPathComponent("guiport")
-        let appIcon = resources.appendingPathComponent("guiport.icns")
-        let plist = contents.appendingPathComponent("Info.plist")
-
+    static func registerCurrentBundle() -> String? {
+        guard let executable = Bundle.main.executableURL?.resolvingSymlinksInPath() else { return nil }
         let lsregister = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
-
-        // If guiport is already running from inside the target bundle (the
-        // packaged layout: bin/guiport -> guiport.app/Contents/MacOS/guiport),
-        // nuking the bundle would delete the running binary out from under us and
-        // the copy below would then fail. The bundle is already correct — just
-        // re-register it and return.
-        if executable.resolvingSymlinksInPath().path
-            .hasPrefix(app.resolvingSymlinksInPath().path + "/") {
-            _ = run(lsregister, ["-f", app.path])
-            return app.path
+        var cursor = executable.deletingLastPathComponent()
+        while cursor.path != "/" {
+            if cursor.pathExtension.lowercased() == "app" {
+                _ = run(lsregister, ["-f", cursor.path])
+                return cursor.path
+            }
+            cursor.deleteLastPathComponent()
         }
-
-        do {
-            // Remove any pre-existing bundle wholesale before rebuilding. A stale
-            // bundle from an older version can carry a dangling `Contents/MacOS`
-            // symlink (pointing at a since-removed Cellar path); `fileExists` follows
-            // that symlink and reports false, so a per-file `copyItem` would throw
-            // "file exists" and abort the whole refresh silently. Nuking first
-            // guarantees the version, icon, and signature are rebuilt from the
-            // currently running binary.
-            if fm.fileExists(atPath: app.path) {
-                try? fm.removeItem(at: app)
-            }
-            try fm.createDirectory(at: macOS, withIntermediateDirectories: true)
-            try fm.createDirectory(at: resources, withIntermediateDirectories: true)
-            if fm.fileExists(atPath: appExecutable.path) {
-                try fm.removeItem(at: appExecutable)
-            }
-            // Copy the *resolved* binary, not the launch path. On Homebrew the
-            // running executable is a relative symlink (bin/guiport -> ../Cellar/…);
-            // copyItem preserves symlinks, so copying it verbatim lands a dangling
-            // ../Cellar link inside Contents/MacOS — an invalid bundle that
-            // LaunchServices rejects, so System Settings falls back to the generic
-            // (terminal) icon. Resolving first copies the real Mach-O.
-            let realExecutable = executable.resolvingSymlinksInPath()
-            try fm.copyItem(at: realExecutable, to: appExecutable)
-            if let icon = findIcon(), fm.fileExists(atPath: icon.path) {
-                if fm.fileExists(atPath: appIcon.path) {
-                    try fm.removeItem(at: appIcon)
-                }
-                try fm.copyItem(at: icon, to: appIcon)
-            }
-            try writeInfoPlist(to: plist)
-            try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: appExecutable.path)
-            _ = run("/usr/bin/codesign", ["--force", "--sign", "-", "--identifier", bundleID, appExecutable.path])
-            _ = run("/usr/bin/codesign", ["--force", "--sign", "-", "--identifier", bundleID, app.path])
-            _ = run(lsregister, ["-f", app.path])
-            return app.path
-        } catch {
-            return nil
-        }
-    }
-
-    private static func writeInfoPlist(to url: URL) throws {
-        let version = Guiport.version
-        let plist = """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-          <key>CFBundleName</key><string>guiport</string>
-          <key>CFBundleDisplayName</key><string>guiport</string>
-          <key>CFBundleIdentifier</key><string>\(bundleID)</string>
-          <key>CFBundleExecutable</key><string>guiport</string>
-          <key>CFBundlePackageType</key><string>APPL</string>
-          <key>CFBundleVersion</key><string>\(version)</string>
-          <key>CFBundleShortVersionString</key><string>\(version)</string>
-          <key>CFBundleIconFile</key><string>guiport</string>
-          <key>LSMinimumSystemVersion</key><string>13.0</string>
-          <key>LSUIElement</key><true/>
-          <key>NSAccessibilityUsageDescription</key><string>guiport reads the macOS Accessibility tree of running apps so coding agents can inspect UI structure, click by selector, and replay tests deterministically.</string>
-          <key>NSScreenCaptureUsageDescription</key><string>guiport captures app windows for screenshots and on-device OCR fallback when an app's accessibility tree is sparse.</string>
-          <key>NSAppleEventsUsageDescription</key><string>guiport may activate target apps before sending input events so clicks and keystrokes route correctly.</string>
-        </dict>
-        </plist>
-        """
-        try plist.write(to: url, atomically: true, encoding: .utf8)
-    }
-
-    private static func findIcon() -> URL? {
-        let fm = FileManager.default
-        var candidates: [URL] = [
-            URL(fileURLWithPath: "/opt/homebrew/share/guiport/icon.icns"),
-            URL(fileURLWithPath: "/usr/local/share/guiport/icon.icns"),
-            fm.homeDirectoryForCurrentUser.appendingPathComponent("Projects/guiport/assets/icon.icns"),
-        ]
-        if let executable = Bundle.main.executableURL {
-            var cursor = executable.deletingLastPathComponent()
-            for _ in 0..<8 {
-                candidates.append(cursor.appendingPathComponent("assets/icon.icns"))
-                cursor.deleteLastPathComponent()
-            }
-        }
-        return candidates.first { fm.fileExists(atPath: $0.path) }
+        // Bare build products have unstable identities. Do not create and
+        // ad-hoc-sign another bundle here: that creates duplicate TCC rows.
+        return nil
     }
 
     private static func run(_ launchPath: String, _ arguments: [String]) -> Int32 {

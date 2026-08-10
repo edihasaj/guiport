@@ -25,7 +25,7 @@ struct InitCommand: AsyncParsableCommand {
         print("")
         print("→ System Settings was opened for any missing permissions.")
         print("→ Look for `guiport` in the list and toggle it on.")
-        print("→ If it was missing, init registered ~/Applications/guiport.app for the permission panes.")
+        print("→ Packaged installs reuse their existing signed app identity.")
         print("→ Then re-run `guiport doctor` to confirm.")
         if !report.ok { throw ExitCode(1) }
     }

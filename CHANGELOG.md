@@ -5,6 +5,11 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Added
+- **Persistent computer-use stream.** `guiport stream` emits an NDJSON feed of
+  screen or app-window frames while atomically refreshing one stable PNG path.
+  It runs until Ctrl-C by default, supports bounded `--seconds` / `--frames`
+  sessions, and keeps the on-screen control indicator alive for exactly the
+  stream lifetime so agents no longer need separate overlay start/stop steps.
 - **Windows: the accessibility tree.** `observe`, `tree`, `find` and selector
   `click` now work on Windows, backed by UI Automation (driven through
   PowerShell's `System.Windows.Automation`, which ships with .NET Framework —
@@ -72,6 +77,9 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
   `unsupported`).
 
 ### Changed
+- Permission setup now reuses the currently running signed app bundle and no
+  longer creates an ad-hoc `~/Applications/guiport.app`. This prevents duplicate
+  Screen Recording entries after Homebrew installs or source-build testing.
 - `guiport overlay demo` now keeps the glow visible until interrupted and
   animates its halo around the screen without moving the physical cursor,
   instead of looking like it crashed after four seconds. Pass `--seconds

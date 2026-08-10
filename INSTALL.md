@@ -66,8 +66,9 @@ Homebrew and the install script already run guiport from inside a signed
 keyed to a stable identity. Run `guiport doctor --fix` to trigger both prompts
 and have macOS enrol `guiport` as its own subject (it uses ScreenCaptureKit, so
 the grant is attributed to `guiport` itself — not the terminal hosting it), then
-toggle it ON. (For bare `swift build` runs with no wrapper, `doctor --fix` also
-registers `~/Applications/guiport.app` so a real app entry still appears.)
+toggle it ON. For source builds, install the app wrapper first with
+`scripts/install-macos-app.sh`; bare binaries have a different identity on each
+build and create duplicate permission rows.
 
 > Upgrading from an older build whose Screen Recording grant was attributed to your
 > terminal? Reset just guiport's stale entry without touching other apps:
