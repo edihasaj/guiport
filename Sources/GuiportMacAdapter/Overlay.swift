@@ -248,8 +248,8 @@ final class OverlayController {
 
 // MARK: - Glow border view
 
-/// Draws the pulsing amber edge glow: a blurred halo layer for the bloom plus a
-/// crisp amber→gold gradient stroke on top.
+/// Draws a subtle pulsing amber edge: a restrained halo plus a thin
+/// amber→gold gradient stroke on top.
 private final class GlowBorderView: NSView {
     private let halo = CAShapeLayer()
     private let gradient = CAGradientLayer()
@@ -262,21 +262,22 @@ private final class GlowBorderView: NSView {
 
         halo.fillColor = nil
         halo.strokeColor = OverlayTheme.amber.cgColor
-        halo.lineWidth = 10
+        halo.lineWidth = 2
         halo.shadowColor = OverlayTheme.amber.cgColor
-        halo.shadowRadius = 28
-        halo.shadowOpacity = 0.9
+        halo.shadowRadius = 6
+        halo.shadowOpacity = 0.15
         halo.shadowOffset = .zero
         halo.masksToBounds = false
         layer?.addSublayer(halo)
 
-        gradient.colors = [OverlayTheme.amber2.cgColor, OverlayTheme.amber.cgColor,
-                           OverlayTheme.amber2.cgColor]
+        gradient.colors = [OverlayTheme.amber2.withAlphaComponent(0.40).cgColor,
+                           OverlayTheme.amber.withAlphaComponent(0.28).cgColor,
+                           OverlayTheme.amber2.withAlphaComponent(0.40).cgColor]
         gradient.startPoint = CGPoint(x: 0, y: 0)
         gradient.endPoint = CGPoint(x: 1, y: 1)
         gradientMask.fillColor = nil
         gradientMask.strokeColor = NSColor.white.cgColor
-        gradientMask.lineWidth = 4
+        gradientMask.lineWidth = 1
         gradient.mask = gradientMask
         layer?.addSublayer(gradient)
 
@@ -292,8 +293,8 @@ private final class GlowBorderView: NSView {
     }
 
     private func updatePaths() {
-        let rect = bounds.insetBy(dx: 7, dy: 7)
-        let path = CGPath(roundedRect: rect, cornerWidth: 22, cornerHeight: 22, transform: nil)
+        let rect = bounds.insetBy(dx: 2.5, dy: 2.5)
+        let path = CGPath(roundedRect: rect, cornerWidth: 10, cornerHeight: 10, transform: nil)
         halo.frame = bounds; halo.path = path
         gradient.frame = bounds
         gradientMask.frame = bounds; gradientMask.path = path
@@ -302,7 +303,7 @@ private final class GlowBorderView: NSView {
     private func startPulse() {
         let pulse = CABasicAnimation(keyPath: "opacity")
         pulse.fromValue = 0.55
-        pulse.toValue = 1.0
+        pulse.toValue = 0.75
         pulse.duration = 1.4
         pulse.autoreverses = true
         pulse.repeatCount = .infinity

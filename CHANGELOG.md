@@ -4,6 +4,10 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Changed
+- Reduced the active screen-edge indicator to a thinner, softer amber border so
+  guiport remains visible without distracting from the controlled app.
+
 ### Added
 - **Persistent computer-use stream.** `guiport stream` emits an NDJSON feed of
   screen or app-window frames while atomically refreshing one stable PNG path.

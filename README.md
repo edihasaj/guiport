@@ -152,9 +152,9 @@ guiport plugin run focus-and-type type-into text="hi" --app TextEdit
 and stopping guiport. It writes newline-delimited JSON frame events to stdout
 and atomically refreshes one PNG path. An agent can let the stream run, read
 only the frame events it needs, inspect the latest image, act, and continue.
-The amber control indicator stays active for the same lifetime and follows the
-real cursor. Press Ctrl-C when finished, or use `--seconds` / `--frames` for a
-bounded session.
+The subtle amber edge indicator stays active for the same lifetime and follows
+the real cursor. Press Ctrl-C when finished, or use `--seconds` / `--frames`
+for a bounded session.
 
 ```sh
 guiport stream --fps 2 -o artifacts/live.png
