@@ -4,6 +4,14 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Fixed
+- The controlling-screen overlay now follows display changes. The long-lived
+  agent daemon built its border windows once and cached them, so plugging in,
+  unplugging, or rearranging a monitor (or changing resolution) left the glow
+  bounding the *old* screen — a small square stuck in a corner of the new main
+  display instead of an edge indicator around it. The overlay now rebuilds its
+  border windows and re-centres the Stop pill on `didChangeScreenParameters`.
+
 ### Changed
 - Reduced the active screen-edge indicator to a thinner, softer amber border so
   guiport remains visible without distracting from the controlled app.

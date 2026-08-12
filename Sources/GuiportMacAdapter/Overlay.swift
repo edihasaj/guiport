@@ -37,7 +37,19 @@ final class OverlayController {
     /// overlay fades away.
     private let idleTimeout: TimeInterval = 2.5
 
-    private init() {}
+    private init() {
+        // The daemon is long-lived (LaunchAgent / idle-exit), so the display
+        // layout can change under it: a monitor plugged in, unplugged,
+        // rearranged, or a resolution change. Rebuild the cached border windows
+        // when that happens — otherwise they keep the old screen's geometry and
+        // paint a small square in a corner instead of bounding the live screen.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.handleScreenChange() }
+        }
+    }
 
     // MARK: - Public API (called from the daemon)
 
@@ -85,6 +97,24 @@ final class OverlayController {
 
     private func overlayBehavior() -> NSWindow.CollectionBehavior {
         [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+    }
+
+    /// Tear down the cached border windows and rebuild them for the current
+    /// screen layout, then re-place the Stop pill on the new main screen. Runs
+    /// on every `didChangeScreenParametersNotification`. Rebuilds even while
+    /// hidden so the *next* `show()` (which reuses cached windows) is correct.
+    private func handleScreenChange() {
+        guard !borderWindows.isEmpty else { return }  // nothing built yet
+        let wasVisible = visible
+        for w in borderWindows { w.orderOut(nil) }
+        borderWindows.removeAll()
+        buildBorderWindows()
+        if let pill { positionPill(pill) }
+        guard wasVisible else { return }
+        // Keep the same stacking order as show(): borders, then cursor, then pill.
+        for w in borderWindows { w.alphaValue = 1; w.orderFrontRegardless() }
+        cursorWindow?.orderFrontRegardless()
+        pill?.orderFrontRegardless()
     }
 
     private func buildBorderWindows() {
