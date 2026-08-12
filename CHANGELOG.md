@@ -5,6 +5,12 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Fixed
+- The input-agent LaunchAgent now survives `brew upgrade`. `agent install` wrote
+  the *resolved versioned* binary path (e.g. `…/Cellar/guiport/0.1.64/…`) into
+  the plist, so the next upgrade deleted that directory and left the daemon in
+  launchd's penalty box until a manual reinstall. It now prefers the stable
+  `bin/guiport` symlink, and `agent restart` rewrites the plist before reloading
+  so existing installs self-heal on the documented post-upgrade step.
 - The controlling-screen overlay now follows display changes. The long-lived
   agent daemon built its border windows once and cached them, so plugging in,
   unplugging, or rearranging a monitor (or changing resolution) left the glow

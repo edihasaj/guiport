@@ -24,12 +24,57 @@ struct AgentCommand: AsyncParsableCommand {
         (NSHomeDirectory() as NSString).appendingPathComponent(".guiport/agent.sock")
     }
 
-    /// Resolve the on-disk path of the running guiport binary so the LaunchAgent
-    /// invokes the same build.
+    /// Path the LaunchAgent should exec.
+    ///
+    /// Prefer a *stable* `guiport` symlink on PATH (e.g. Homebrew's
+    /// `bin/guiport`) that resolves to this running binary. Homebrew points that
+    /// symlink into the versioned Cellar bundle and re-points it on every
+    /// `brew upgrade`; baking the resolved versioned path into the plist instead
+    /// leaves the LaunchAgent exec'ing a directory the next upgrade deletes.
+    /// The exec'd binary is the same signed bundle either way, so the Screen
+    /// Recording (TCC) identity is unchanged. Falls back to the resolved
+    /// executable path for non-Homebrew installs with no such symlink.
     static func guiportPath() -> String {
-        if let p = Bundle.main.executableURL?.resolvingSymlinksInPath().path { return p }
-        let argv0 = CommandLine.arguments.first ?? "guiport"
-        return URL(fileURLWithPath: argv0).resolvingSymlinksInPath().path
+        let resolved = Bundle.main.executableURL?.resolvingSymlinksInPath().path
+            ?? URL(fileURLWithPath: CommandLine.arguments.first ?? "guiport")
+                .resolvingSymlinksInPath().path
+        var candidates = ["/opt/homebrew/bin/guiport", "/usr/local/bin/guiport"]
+        if let path = ProcessInfo.processInfo.environment["PATH"] {
+            candidates += path.split(separator: ":").map { "\($0)/guiport" }
+        }
+        let fm = FileManager.default
+        for c in candidates where fm.fileExists(atPath: c) {
+            // Only trust a symlink that actually resolves to this same binary.
+            if URL(fileURLWithPath: c).resolvingSymlinksInPath().path == resolved { return c }
+        }
+        return resolved
+    }
+
+    /// Write the LaunchAgent plist for the current binary. Idempotent — both
+    /// `install` and `restart` call it so an upgraded install re-points itself.
+    static func writePlist() throws {
+        let bin = guiportPath()
+        let plist = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+          <key>Label</key><string>\(label)</string>
+          <key>ProgramArguments</key>
+          <array>
+            <string>\(bin)</string>
+            <string>agent-daemon</string>
+          </array>
+          <key>RunAtLoad</key><true/>
+          <key>KeepAlive</key><true/>
+          <key>ProcessType</key><string>Interactive</string>
+          <key>StandardErrorPath</key><string>\(NSHomeDirectory())/.guiport/agent.log</string>
+        </dict>
+        </plist>
+        """
+        let dir = (plistPath as NSString).deletingLastPathComponent
+        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        try plist.write(toFile: plistPath, atomically: true, encoding: .utf8)
     }
 
     static func currentUID() -> String {
@@ -71,28 +116,7 @@ struct AgentCommand: AsyncParsableCommand {
         )
 
         func run() async throws {
-            let bin = AgentCommand.guiportPath()
-            let plist = """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-            <plist version="1.0">
-            <dict>
-              <key>Label</key><string>\(AgentCommand.label)</string>
-              <key>ProgramArguments</key>
-              <array>
-                <string>\(bin)</string>
-                <string>agent-daemon</string>
-              </array>
-              <key>RunAtLoad</key><true/>
-              <key>KeepAlive</key><true/>
-              <key>ProcessType</key><string>Interactive</string>
-              <key>StandardErrorPath</key><string>\(NSHomeDirectory())/.guiport/agent.log</string>
-            </dict>
-            </plist>
-            """
-            let dir = (AgentCommand.plistPath as NSString).deletingLastPathComponent
-            try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-            try plist.write(toFile: AgentCommand.plistPath, atomically: true, encoding: .utf8)
+            try AgentCommand.writePlist()
 
             let uid = AgentCommand.currentUID()
             // Reload cleanly: bootout any prior instance, then bootstrap fresh.
@@ -148,6 +172,10 @@ struct AgentCommand: AsyncParsableCommand {
     struct Restart: AsyncParsableCommand {
         static let configuration = CommandConfiguration(abstract: "Restart the daemon (after a guiport upgrade).")
         func run() async throws {
+            // Rewrite the plist first: after a `brew upgrade` an old install may
+            // still point at a now-deleted versioned path, so restart re-points
+            // it at the current binary before reloading.
+            try AgentCommand.writePlist()
             let uid = AgentCommand.currentUID()
             AgentCommand.launchctl(["bootout", "gui/\(uid)/\(AgentCommand.label)"])
             let r = AgentCommand.launchctl(["bootstrap", "gui/\(uid)", AgentCommand.plistPath])
