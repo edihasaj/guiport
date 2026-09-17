@@ -1,5 +1,55 @@
 # guiport
 
-> Playwright for desktop apps, built for coding agents.
+> guiport is Playwright for desktop apps, built for coding agents. A fast CLI and MCP control layer that lets agents inspect and operate native desktop applications through structured UI data, then save successful flows as replayable tests.
 
-- [Home](https://guiport.dev)
+## What is guiport?
+
+guiport (guiport.dev) exposes the desktop as structured data instead of pixels. Coding agents such as Claude Code, Codex, opencode, and Gemini can list apps and windows, read the accessibility tree, find elements by selector, click, type, take screenshots, and record flows that replay deterministically later.
+
+It is written in Swift, MIT licensed, and ships prebuilt binaries for macOS, Windows, and Linux.
+
+- Home: https://guiport.dev
+- Source: https://github.com/edihasaj/guiport
+- Install guide: https://github.com/edihasaj/guiport/blob/main/INSTALL.md
+- Releases: https://github.com/edihasaj/guiport/releases/latest
+
+## Why it exists
+
+Agents should not drive desktop apps by guessing pixel coordinates. guiport gives them the app and window list, the focused app and window, the accessibility tree, element role, name, value, state, bounds and actions, screenshots only when they are actually needed, and deterministic replay scripts after exploration.
+
+## Core commands
+
+- `apps` - list and resolve running applications and windows
+- `observe` / `tree` / `find` - read structured UI state and locate elements by selector
+- `click` / `click-at` / `type` / `hotkey` - drive input
+- `find-text` / `click-text` - OCR fallback when an app draws its own UI
+- `screenshot` - full screen or a single window
+- `record` - capture a flow and replay it as a test
+- `lifecycle` - launch, quit, kill, restart an app
+- `doctor --fix` - check and repair the required OS permissions
+
+The same selectors work across platforms: `guiport click 'button[name="Send"]'` means the same thing on macOS and Windows, so a script written on a Mac runs unchanged elsewhere.
+
+## Platform support
+
+- macOS 13+ - primary target, full stack. Accessibility tree first, screenshots as fallback.
+- Windows 10+ - standalone binary. Input, screenshot, apps, UI Automation selectors, WinRT OCR. Recording is still pending.
+- Linux - standalone binary. Input, screenshot and app enumeration on X11 and Wayland. AT-SPI2 tree and OCR are pending and fail with a labeled, actionable error rather than crashing.
+
+Verbs that are not yet implemented on a platform exit non-zero with a labeled error code, so an agent can branch on it instead of guessing.
+
+## Install
+
+```sh
+brew install edihasaj/guiport/guiport
+```
+
+Or use the install script, or build from source with Swift.
+
+## Use with agents
+
+guiport runs as a plain CLI or as an MCP server, so any agent that can call a command line tool or speak MCP can use it. Typical uses: end-to-end testing of a desktop app, reproducing a bug report on a real machine, driving apps that have no API, and turning a manual QA pass into a replayable script.
+
+## Author
+
+Built by Edi Hasaj (https://edihasaj.com). License: MIT.

@@ -292,3 +292,13 @@ footer {
   font-size: 13px;
 }
 footer a { color: var(--amber-2); }
+.ask-ai { margin-top: 28px; }
+.ask-ai-label {
+  margin: 0 0 10px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.ask-ai-links { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.ask-ai-links a { font-size: 13px; }
