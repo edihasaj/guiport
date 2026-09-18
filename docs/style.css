@@ -300,5 +300,12 @@ footer a { color: var(--amber-2); }
   text-transform: uppercase;
   color: var(--ink-dim);
 }
-.ask-ai-links { display: flex; flex-wrap: wrap; gap: 8px 20px; }
-.ask-ai-links a { font-size: 13px; }
+.ask-ai-links { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; }
+.ask-ai-links a {
+  display: inline-flex;
+  color: var(--ink-dim);
+  opacity: 0.55;
+  transition: opacity 140ms ease, color 140ms ease;
+}
+.ask-ai-links a:hover { opacity: 1; color: var(--amber-2); }
+.ask-ai-links svg { width: 22px; height: 22px; }
