@@ -60,13 +60,13 @@ enum Screenshot {
         return ScreenshotResult(path: path, width: image.width, height: image.height, scope: "window")
     }
 
-    private struct WindowDescriptor {
+    struct WindowDescriptor {
         let windowNumber: Int
         let title: String?
         let bounds: CGRect
     }
 
-    private static func topWindowInfo(for pid: pid_t, titleHint: String?) -> WindowDescriptor? {
+    static func topWindowInfo(for pid: pid_t, titleHint: String?) -> WindowDescriptor? {
         let opts: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
         guard let arr = CGWindowListCopyWindowInfo(opts, kCGNullWindowID) as? [[String: Any]] else { return nil }
         let mine = arr.filter { ($0[kCGWindowOwnerPID as String] as? pid_t) == pid }
@@ -90,7 +90,7 @@ enum Screenshot {
         return descriptors.first
     }
 
-    private static func writePNG(_ image: CGImage, to path: String) throws {
+    static func writePNG(_ image: CGImage, to path: String) throws {
         let url = URL(fileURLWithPath: path)
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let type = UTType.png.identifier as CFString

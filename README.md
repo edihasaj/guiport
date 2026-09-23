@@ -156,10 +156,19 @@ The subtle amber edge indicator stays active for the same lifetime and follows
 the real cursor. Press Ctrl-C when finished, or use `--seconds` / `--frames`
 for a bounded session.
 
+On macOS 14 and later the stream is one ScreenCaptureKit session for the whole
+run, so frames arrive as the screen changes, up to 60 per second, instead of a
+new capture for every frame. Each frame event carries `captured_at_ms`.
+`--frames-dir` keeps every frame as a numbered PNG for later analysis.
+`--with-overlays` captures an app window's region of the screen instead of the
+window alone, so floating panels from other apps, such as autocomplete
+suggestions or popovers, appear in the frames.
+
 ```sh
 guiport stream --fps 2 -o artifacts/live.png
 guiport stream --app "Safari" --window "Start Page" -o artifacts/safari-live.png
 guiport stream --frames 1 -o /tmp/guiport-frame.png
+guiport stream --app TextEdit --with-overlays --fps 30 --frames-dir artifacts/frames
 ```
 
 ## Plugins

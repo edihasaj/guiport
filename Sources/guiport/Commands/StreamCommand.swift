@@ -19,7 +19,7 @@ struct StreamCommand: AsyncParsableCommand {
 
     @OptionGroup var app: AppOption
 
-    @Option(name: .long, help: "Maximum frames per second (0.1...10).")
+    @Option(name: .long, help: "Maximum frames per second (0.1...60).")
     var fps: Double = 2
 
     @Option(name: .long, help: "Stop after this many seconds.")
@@ -31,9 +31,15 @@ struct StreamCommand: AsyncParsableCommand {
     @Option(name: [.customShort("o"), .long], help: "Stable PNG path updated atomically. Defaults to artifacts/.")
     var output: String?
 
+    @Option(name: .long, help: "Also keep every frame as frame-NNNNNN-<epoch ms>.png in this directory.")
+    var framesDir: String?
+
+    @Flag(name: .long, help: "With --app, capture the window's screen region so other apps' overlays are included.")
+    var withOverlays = false
+
     mutating func validate() throws {
-        guard (0.1...10).contains(fps) else {
-            throw ValidationError("--fps must be between 0.1 and 10")
+        guard (0.1...60).contains(fps) else {
+            throw ValidationError("--fps must be between 0.1 and 60")
         }
         if let seconds, seconds <= 0 {
             throw ValidationError("--seconds must be greater than zero")
@@ -58,6 +64,13 @@ struct StreamCommand: AsyncParsableCommand {
             "output": path,
             "scope": target == nil ? "screen" : "window",
         ])
+
+        #if canImport(GuiportMacAdapter)
+        if #available(macOS 14.0, *) {
+            try await runLive(target: target, path: path, deadline: deadline)
+            return
+        }
+        #endif
 
         while deadline.map({ Date() < $0 }) ?? true {
             if let frames, sequence >= frames { break }
@@ -89,6 +102,46 @@ struct StreamCommand: AsyncParsableCommand {
 
         emit(["event": "stopped", "frames": sequence, "path": path])
     }
+
+    #if canImport(GuiportMacAdapter)
+    /// One ScreenCaptureKit session for the whole run: frames arrive as the
+    /// screen changes instead of restarting a capture per frame.
+    @available(macOS 14.0, *)
+    private func runLive(target: AppTarget?, path: String, deadline: Date?) async throws {
+        let limit = frames
+        var delivered = 0
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        try await LiveCapture.run(
+            target: target,
+            fps: fps,
+            withOverlays: withOverlays,
+            output: path,
+            framesDir: framesDir,
+            shouldStop: { sequence in
+                if let limit, sequence >= limit { return true }
+                return deadline.map { Date() >= $0 } ?? false
+            },
+            onFrame: { frame, sequence in
+                delivered = sequence
+                SessionBridge.pingActivity(kind: "stream", point: nil)
+                var event: [String: Any] = [
+                    "event": "frame",
+                    "sequence": sequence,
+                    "captured_at": formatter.string(from: frame.capturedAt),
+                    "captured_at_ms": Int(frame.capturedAt.timeIntervalSince1970 * 1000),
+                    "path": frame.path,
+                    "width": frame.width,
+                    "height": frame.height,
+                    "scope": frame.scope,
+                ]
+                if let archived = frame.archivedPath { event["archived_path"] = archived }
+                emit(event)
+            }
+        )
+        emit(["event": "stopped", "frames": delivered, "path": path])
+    }
+    #endif
 
     private func captureAtomically(target: AppTarget?, path: String) throws -> ScreenshotResult {
         let destination = URL(fileURLWithPath: path)

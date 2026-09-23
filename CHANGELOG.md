@@ -4,6 +4,20 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Changed
+- `guiport stream` now keeps one ScreenCaptureKit session open for the whole
+  run on macOS 14 and later. It used to take a separate screenshot for every
+  frame, which capped a full-screen feed at about 4 frames per second and
+  spaced frames unevenly. Frames now arrive as the screen changes, up to
+  `--fps 60`, and each event includes `captured_at_ms`.
+
+### Added
+- `guiport stream --frames-dir <dir>` keeps every frame as
+  `frame-NNNNNN-<epoch ms>.png` instead of only refreshing one path.
+- `guiport stream --with-overlays` captures an app window's region of the
+  screen, so other apps' floating panels (autocomplete suggestions, popovers)
+  are visible. A plain window capture leaves them out.
+
 ### Fixed
 - The input-agent LaunchAgent now survives `brew upgrade`. `agent install` wrote
   the *resolved versioned* binary path (e.g. `…/Cellar/guiport/0.1.64/…`) into
