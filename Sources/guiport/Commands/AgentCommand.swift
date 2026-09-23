@@ -108,6 +108,43 @@ struct AgentCommand: AsyncParsableCommand {
         return (p.terminationStatus, out)
     }
 
+    /// Reload the LaunchAgent and confirm the daemon is running.
+    ///
+    /// `launchctl bootout` returns before launchd has finished removing the
+    /// service, so an immediate `bootstrap` often fails with "Bootstrap failed:
+    /// 5: Input/output error" and leaves no daemon at all. That is what made the
+    /// first `agent restart` after a `brew upgrade` report success while input
+    /// commands then failed with "Aqua input agent not reachable".
+    static func reload() -> (ok: Bool, running: Bool, note: String) {
+        let uid = currentUID()
+        let service = "gui/\(uid)/\(label)"
+        launchctl(["bootout", service])
+        _ = waitFor(seconds: 5) { launchctl(["print", service]).code != 0 }
+        var result = launchctl(["bootstrap", "gui/\(uid)", plistPath])
+        var attempts = 1
+        while result.code != 0, attempts < 5 {
+            Thread.sleep(forTimeInterval: 0.5)
+            result = launchctl(["bootstrap", "gui/\(uid)", plistPath])
+            attempts += 1
+        }
+        let running = result.code == 0 && waitFor(seconds: 5) {
+            launchctl(["print", service]).out.contains("state = running")
+        }
+        let note = result.code == 0
+            ? (running ? "daemon running" : "daemon loaded but not running yet; check ~/.guiport/agent.log")
+            : "launchctl bootstrap failed after \(attempts) attempts: \(result.out.trimmingCharacters(in: .whitespacesAndNewlines))"
+        return (result.code == 0, running, note)
+    }
+
+    static func waitFor(seconds: Double, _ condition: () -> Bool) -> Bool {
+        let deadline = Date().addingTimeInterval(seconds)
+        repeat {
+            if condition() { return true }
+            Thread.sleep(forTimeInterval: 0.1)
+        } while Date() < deadline
+        return condition()
+    }
+
     // MARK: install
 
     struct Install: AsyncParsableCommand {
@@ -118,20 +155,18 @@ struct AgentCommand: AsyncParsableCommand {
         func run() async throws {
             try AgentCommand.writePlist()
 
-            let uid = AgentCommand.currentUID()
             // Reload cleanly: bootout any prior instance, then bootstrap fresh.
-            AgentCommand.launchctl(["bootout", "gui/\(uid)/\(AgentCommand.label)"])
-            let r = AgentCommand.launchctl(["bootstrap", "gui/\(uid)", AgentCommand.plistPath])
+            let r = AgentCommand.reload()
 
             var note = "installed LaunchAgent at \(AgentCommand.plistPath)"
-            if r.code != 0 {
+            if !r.ok {
                 // Common when run from a non-GUI session — the plist will still
                 // auto-load on next login; surface guidance instead of failing.
-                note += "; could not bootstrap now (run this from a Terminal in the logged-in GUI session, or it loads on next login). launchctl: \(r.out.trimmingCharacters(in: .whitespacesAndNewlines))"
+                note += "; could not bootstrap now (run this from a Terminal in the logged-in GUI session, or it loads on next login). \(r.note)"
             } else {
-                note += "; daemon started in GUI session"
+                note += "; \(r.note)"
             }
-            AgentCommand.emit(["ok": true, "note": note])
+            AgentCommand.emit(["ok": true, "running": r.running, "note": note])
         }
     }
 
@@ -176,10 +211,8 @@ struct AgentCommand: AsyncParsableCommand {
             // still point at a now-deleted versioned path, so restart re-points
             // it at the current binary before reloading.
             try AgentCommand.writePlist()
-            let uid = AgentCommand.currentUID()
-            AgentCommand.launchctl(["bootout", "gui/\(uid)/\(AgentCommand.label)"])
-            let r = AgentCommand.launchctl(["bootstrap", "gui/\(uid)", AgentCommand.plistPath])
-            AgentCommand.emit(["ok": r.code == 0, "note": r.out.trimmingCharacters(in: .whitespacesAndNewlines)])
+            let r = AgentCommand.reload()
+            AgentCommand.emit(["ok": r.ok && r.running, "running": r.running, "note": r.note])
         }
     }
 }

@@ -4,6 +4,14 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Fixed
+- `guiport agent restart` (and `install`) no longer leave the input agent
+  stopped. `launchctl bootout` returns before the old service is gone, so the
+  immediate `bootstrap` could fail and input commands then reported "Aqua input
+  agent not reachable" until a second restart. Both now wait for the old
+  service to go, retry the bootstrap briefly, confirm the daemon is running,
+  and report `running` in their output.
+
 ### Changed
 - `guiport stream` now keeps one capture session open for the whole run: a
   ScreenCaptureKit stream on macOS 14 and later, and an `ffmpeg -f x11grab`
