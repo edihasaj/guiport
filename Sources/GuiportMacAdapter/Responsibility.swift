@@ -56,6 +56,15 @@ public enum Responsibility {
         var pid: pid_t = 0
         // stdio inherited by default (no file actions) → transparent passthrough.
         guard posix_spawn(&pid, exePath, nil, &attr, argv, envp) == 0 else { return }
+        // A caller that stops us with a signal (a harness calling terminate(),
+        // `kill`, a closed session) only reaches this wrapper. Forward it so the
+        // child, which owns the capture session, stops too instead of streaming on.
+        disclaimedChild = pid
+        for sig in [SIGTERM, SIGINT, SIGHUP] {
+            signal(sig) { received in
+                if disclaimedChild > 0 { kill(disclaimedChild, received) }
+            }
+        }
 
         var status: Int32 = 0
         while waitpid(pid, &status, 0) == -1 && errno == EINTR { continue }
@@ -66,6 +75,9 @@ public enum Responsibility {
         exit(1)                            // killed by signal → generic failure
     }
 }
+
+/// Child spawned by `disclaimIfNeeded`; read by the signal forwarder.
+nonisolated(unsafe) private var disclaimedChild: pid_t = 0
 
 /// Private libsystem entry point: mark a spawned process as its own responsible
 /// process for TCC purposes. Stable since macOS 10.14; declared here because it has

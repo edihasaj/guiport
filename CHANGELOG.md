@@ -5,6 +5,11 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Fixed
+- Stopping `guiport stream`, `screenshot` or `record` with a signal now stops
+  the capture. These commands re-launch guiport as its own responsible process
+  for Screen Recording, and SIGTERM only reached the wrapper, so a script that
+  called `terminate()` left the child streaming. The wrapper now forwards
+  SIGTERM, SIGINT and SIGHUP to the child.
 - `guiport agent restart` (and `install`) no longer leave the input agent
   stopped. `launchctl bootout` returns before the old service is gone, so the
   immediate `bootstrap` could fail and input commands then reported "Aqua input
