@@ -91,6 +91,43 @@ enum WinScreenshot {
                                 scope: ok ? "window" : "window-bitblt")
     }
 
+    // MARK: - Window region (with overlays)
+
+    /// Copies the window's rectangle from the screen, so other windows drawn
+    /// over it (autocomplete suggestions, popovers) stay in the image.
+    static func captureWindowRegion(target: AppTarget, to path: String) throws -> ScreenshotResult {
+        guard let hwnd = hwnd(forPid: DWORD(target.pid), titleHint: target.windowTitleHint) else {
+            throw GuiportError(code: "no_window", message: "no top-level window for pid \(target.pid)")
+        }
+        var rect = RECT()
+        GetWindowRect(hwnd, &rect)
+        let w = Int32(rect.right - rect.left)
+        let h = Int32(rect.bottom - rect.top)
+        guard w > 0, h > 0 else {
+            throw GuiportError(code: "empty_window", message: "window has zero area")
+        }
+        guard let screenDC = GetDC(nil) else {
+            throw GuiportError(code: "getdc_failed", message: "GetDC returned nil")
+        }
+        defer { ReleaseDC(nil, screenDC) }
+        guard let memDC = CreateCompatibleDC(screenDC) else {
+            throw GuiportError(code: "compatible_dc_failed", message: "CreateCompatibleDC returned nil")
+        }
+        defer { DeleteDC(memDC) }
+        guard let bmp = CreateCompatibleBitmap(screenDC, w, h) else {
+            throw GuiportError(code: "bitmap_failed", message: "CreateCompatibleBitmap returned nil")
+        }
+        defer { DeleteObject(bmp) }
+        let prev = SelectObject(memDC, bmp)
+        defer { SelectObject(memDC, prev) }
+        let ok = BitBlt(memDC, 0, 0, w, h, screenDC, rect.left, rect.top, DWORD(SRCCOPY) | DWORD(CAPTUREBLT))
+        if !ok {
+            throw GuiportError(code: "bitblt_failed", message: "BitBlt of window region failed")
+        }
+        try writePng(bitmap: bmp, dc: memDC, width: Int(w), height: Int(h), to: path)
+        return ScreenshotResult(path: path, width: Int(w), height: Int(h), scope: "region")
+    }
+
     // MARK: - HWND lookup
 
     static func topLevelHwnd(forPid pid: DWORD) -> HWND? {

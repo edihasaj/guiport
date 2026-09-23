@@ -100,6 +100,21 @@ public struct MacAdapter: DesktopAdapter {
         try Screenshot.capture(target: target, to: path)
     }
 
+    public func captureScreenshot(target: AppTarget?, to path: String, includeOverlays: Bool) throws -> ScreenshotResult {
+        guard includeOverlays, let target else { return try Screenshot.capture(target: target, to: path) }
+        return try Screenshot.captureRegion(of: target, to: path)
+    }
+
+    public func runLiveStream(
+        _ request: LiveStreamRequest,
+        shouldStop: @escaping @Sendable (Int) -> Bool,
+        onFrame: @escaping (StreamFrame, Int) -> Void
+    ) async throws -> Bool {
+        guard #available(macOS 14.0, *) else { return false }
+        try await LiveCapture.run(request, shouldStop: shouldStop, onFrame: onFrame)
+        return true
+    }
+
     public func defaultScreenshotPath() -> String { Screenshot.defaultPath() }
 
     public func findText(in target: AppTarget?, query: String, exact: Bool, limit: Int) throws -> [OCRMatch] {

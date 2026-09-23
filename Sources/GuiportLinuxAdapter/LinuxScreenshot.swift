@@ -58,6 +58,44 @@ enum LinuxScreenshot {
         return result(path: path, scope: "window")
     }
 
+    // MARK: - X11 window region (with overlays)
+
+    struct Geometry { let x: Int; let y: Int; let width: Int; let height: Int }
+
+    /// Screen rectangle of the target's first X11 window, via xdotool.
+    static func x11Geometry(for target: AppTarget) throws -> Geometry {
+        guard LinuxSession.current == .x11 else {
+            throw GuiportError(code: "wayland_per_window_unsupported",
+                               message: "window regions aren't portable on Wayland",
+                               hint: "Omit --app to capture the whole screen.")
+        }
+        try Shell.require("xdotool", hint: "Install: sudo apt install xdotool")
+        let search = Shell.env("xdotool", ["search", "--onlyvisible", "--pid", String(target.pid)])
+        guard let id = search.stdout.split(separator: "\n").first.map(String.init) else {
+            throw GuiportError(code: "no_window", message: "no X11 window for pid \(target.pid)")
+        }
+        var values: [String: Int] = [:]
+        for line in Shell.env("xdotool", ["getwindowgeometry", "--shell", id]).stdout.split(separator: "\n") {
+            let parts = line.split(separator: "=", maxSplits: 1)
+            if parts.count == 2, let v = Int(parts[1]) { values[String(parts[0])] = v }
+        }
+        guard let x = values["X"], let y = values["Y"], let w = values["WIDTH"], let h = values["HEIGHT"], w > 0, h > 0 else {
+            throw GuiportError(code: "no_window", message: "could not read X11 geometry for pid \(target.pid)")
+        }
+        return Geometry(x: x, y: y, width: w, height: h)
+    }
+
+    /// Crops the window's rectangle from the root window, so other windows
+    /// drawn over it (autocomplete suggestions, popovers) are kept.
+    static func captureX11Region(target: AppTarget, to path: String) throws -> ScreenshotResult {
+        try ensureParentDir(path)
+        let g = try x11Geometry(for: target)
+        guard Shell.which("import") else { throw missingTool(["imagemagick (import)"]) }
+        try check(Shell.env("import", ["-window", "root", "-crop", "\(g.width)x\(g.height)+\(g.x)+\(g.y)", "+repage", path]),
+                  "import -crop")
+        return result(path: path, scope: "region")
+    }
+
     // MARK: - Wayland
 
     private static func captureWayland(target: AppTarget?, to path: String) throws -> ScreenshotResult {
@@ -82,16 +120,17 @@ enum LinuxScreenshot {
     // MARK: - Helpers
 
     private static func result(path: String, scope: String) -> ScreenshotResult {
-        let (w, h) = pngDimensions(path: path) ?? (0, 0)
+        let data = (try? Data(contentsOf: URL(fileURLWithPath: path))) ?? Data()
+        let (w, h) = pngDimensions(data) ?? (0, 0)
         return ScreenshotResult(path: path, width: w, height: h, scope: scope)
     }
 
     /// Best-effort PNG dimension probe — reads the IHDR chunk. Falls back to (0, 0)
     /// for non-PNG output (e.g. user passed a `.jpg` path); the scope/path fields
     /// remain authoritative regardless.
-    private static func pngDimensions(path: String) -> (Int, Int)? {
-        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
-              data.count >= 24 else { return nil }
+    static func pngDimensions(_ png: Data) -> (Int, Int)? {
+        let data = Data(png)  // rebase: slices keep their parent's indices
+        guard data.count >= 24 else { return nil }
         // PNG signature 89 50 4E 47 0D 0A 1A 0A
         let sig: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
         for i in 0..<8 where data[i] != sig[i] { return nil }

@@ -95,6 +95,11 @@ public struct WindowsAdapter: DesktopAdapter {
         try WinScreenshot.capture(target: target, to: path)
     }
 
+    public func captureScreenshot(target: AppTarget?, to path: String, includeOverlays: Bool) throws -> ScreenshotResult {
+        guard includeOverlays, let target else { return try WinScreenshot.capture(target: target, to: path) }
+        return try WinScreenshot.captureWindowRegion(target: target, to: path)
+    }
+
     public func defaultScreenshotPath() -> String {
         "artifacts\\screenshot.png"
     }

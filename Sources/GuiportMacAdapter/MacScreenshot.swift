@@ -60,6 +60,33 @@ enum Screenshot {
         return ScreenshotResult(path: path, width: image.width, height: image.height, scope: "window")
     }
 
+    /// The window's rectangle cut from a display capture, so floating panels
+    /// from other apps over it (autocomplete suggestions, popovers) are kept.
+    static func captureRegion(of target: AppTarget, to path: String) throws -> ScreenshotResult {
+        try Doctor.ensureScreenRecordingOrThrow()
+        guard let info = topWindowInfo(for: target.pid, titleHint: target.windowTitleHint) else {
+            throw GuiportError(code: "no_window", message: "could not find a window for \(target.name)")
+        }
+        let screen = NSScreen.screens.first { screen in
+            let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+            return id.map { CGDisplayBounds($0).intersects(info.bounds) } ?? false
+        } ?? NSScreen.main
+        guard let screen,
+              let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
+            throw GuiportError(code: "no_screen", message: "no display under \(target.name)")
+        }
+        let scale = screen.backingScaleFactor
+        let display = try ScreenCapture.captureDisplay(displayID, scale: scale)
+        let bounds = CGDisplayBounds(displayID)
+        let local = info.bounds.intersection(bounds).offsetBy(dx: -bounds.minX, dy: -bounds.minY)
+        let crop = CGRect(x: local.minX * scale, y: local.minY * scale, width: local.width * scale, height: local.height * scale)
+        guard let image = display.cropping(to: crop.integral) else {
+            throw GuiportError(code: "capture_failed", message: "window region is off screen")
+        }
+        try writePNG(image, to: path)
+        return ScreenshotResult(path: path, width: image.width, height: image.height, scope: "region")
+    }
+
     struct WindowDescriptor {
         let windowNumber: Int
         let title: String?

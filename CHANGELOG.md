@@ -5,18 +5,21 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Changed
-- `guiport stream` now keeps one ScreenCaptureKit session open for the whole
-  run on macOS 14 and later. It used to take a separate screenshot for every
-  frame, which capped a full-screen feed at about 4 frames per second and
-  spaced frames unevenly. Frames now arrive as the screen changes, up to
-  `--fps 60`, and each event includes `captured_at_ms`.
+- `guiport stream` now keeps one capture session open for the whole run: a
+  ScreenCaptureKit stream on macOS 14 and later, and an `ffmpeg -f x11grab`
+  process on Linux X11. It used to take a separate screenshot for every frame,
+  which capped a full-screen feed at about 4 frames per second on macOS and
+  started a new tool process per frame on Linux. Frames now arrive continuously,
+  up to `--fps 60`, and each event includes `captured_at_ms`. Windows, macOS 13
+  and Wayland keep one capture per frame.
 
 ### Added
 - `guiport stream --frames-dir <dir>` keeps every frame as
   `frame-NNNNNN-<epoch ms>.png` instead of only refreshing one path.
 - `guiport stream --with-overlays` captures an app window's region of the
   screen, so other apps' floating panels (autocomplete suggestions, popovers)
-  are visible. A plain window capture leaves them out.
+  are visible. A plain window capture leaves them out. Supported on macOS,
+  Windows and Linux X11.
 
 ### Fixed
 - The input-agent LaunchAgent now survives `brew upgrade`. `agent install` wrote

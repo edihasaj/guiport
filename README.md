@@ -156,13 +156,20 @@ The subtle amber edge indicator stays active for the same lifetime and follows
 the real cursor. Press Ctrl-C when finished, or use `--seconds` / `--frames`
 for a bounded session.
 
-On macOS 14 and later the stream is one ScreenCaptureKit session for the whole
-run, so frames arrive as the screen changes, up to 60 per second, instead of a
-new capture for every frame. Each frame event carries `captured_at_ms`.
+The stream keeps one capture session open where the platform allows it, up to
+60 frames per second, and each frame event carries `captured_at_ms`:
+
+| Platform | Capture |
+| --- | --- |
+| macOS 14+ | One ScreenCaptureKit session; frames arrive as the screen changes |
+| Linux X11 with `ffmpeg` | One `ffmpeg -f x11grab` process piping PNG frames |
+| Windows, macOS 13, Wayland | One in-process capture per frame (GDI, CoreGraphics, `grim`) |
+
 `--frames-dir` keeps every frame as a numbered PNG for later analysis.
 `--with-overlays` captures an app window's region of the screen instead of the
 window alone, so floating panels from other apps, such as autocomplete
-suggestions or popovers, appear in the frames.
+suggestions or popovers, appear in the frames. It works on macOS, Windows and
+Linux X11; Wayland has no portable window geometry.
 
 ```sh
 guiport stream --fps 2 -o artifacts/live.png

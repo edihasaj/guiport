@@ -14,15 +14,6 @@ import VideoToolbox
 /// changes, up to the requested rate, until the caller stops it.
 @available(macOS 14.0, *)
 public enum LiveCapture {
-    public struct Frame {
-        public let path: String
-        public let archivedPath: String?
-        public let width: Int
-        public let height: Int
-        public let scope: String
-        public let capturedAt: Date
-    }
-
     /// Streams frames until `shouldStop` returns true.
     /// - Parameters:
     ///   - target: window to follow; nil streams the main display.
@@ -31,14 +22,12 @@ public enum LiveCapture {
     ///     (autocomplete ghosts, popovers) are included.
     ///   - framesDir: when set, every frame is also kept as `frame-NNNNNN-<ms>.png`.
     public static func run(
-        target: AppTarget?,
-        fps: Double,
-        withOverlays: Bool,
-        output: String,
-        framesDir: String?,
-        shouldStop: @escaping (Int) -> Bool,
-        onFrame: @escaping (Frame, Int) -> Void
+        _ request: LiveStreamRequest,
+        shouldStop: @escaping @Sendable (Int) -> Bool,
+        onFrame: @escaping (StreamFrame, Int) -> Void
     ) async throws {
+        let (target, fps, withOverlays, output, framesDir) =
+            (request.target, request.fps, request.withOverlays, request.output, request.framesDir)
         try Doctor.ensureScreenRecordingOrThrow()
         let (filter, sourceRect, pointSize, scope) = try await contentFilter(target: target, withOverlays: withOverlays)
         let scale = NSScreen.main?.backingScaleFactor ?? 2
@@ -57,10 +46,6 @@ public enum LiveCapture {
         try stream.addStreamOutput(receiver, type: .screen, sampleHandlerQueue: receiver.queue)
         try await stream.startCapture()
         defer { Task { try? await stream.stopCapture() } }
-        if let framesDir {
-            try FileManager.default.createDirectory(atPath: framesDir, withIntermediateDirectories: true)
-        }
-
         var sequence = 0
         for try await (image, capturedAt) in receiver.images {
             if shouldStop(sequence) { break }
@@ -68,13 +53,12 @@ public enum LiveCapture {
             sequence += 1
             var archived: String?
             if let framesDir {
-                let ms = Int(capturedAt.timeIntervalSince1970 * 1000)
-                let path = (framesDir as NSString).appendingPathComponent(String(format: "frame-%06d-%d.png", sequence, ms))
+                let path = StreamArchive.path(in: framesDir, sequence: sequence, capturedAt: capturedAt)
                 try writePNG(image, to: path)
                 archived = path
             }
-            onFrame(Frame(path: output, archivedPath: archived, width: image.width, height: image.height,
-                          scope: scope, capturedAt: capturedAt), sequence)
+            onFrame(StreamFrame(path: output, archivedPath: archived, width: image.width, height: image.height,
+                                scope: scope, capturedAt: capturedAt), sequence)
             if shouldStop(sequence) { break }
         }
         try? await stream.stopCapture()

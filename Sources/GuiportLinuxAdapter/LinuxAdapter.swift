@@ -83,6 +83,21 @@ public struct LinuxAdapter: DesktopAdapter {
         try LinuxScreenshot.capture(target: target, to: path)
     }
 
+    public func captureScreenshot(target: AppTarget?, to path: String, includeOverlays: Bool) throws -> ScreenshotResult {
+        guard includeOverlays, let target else { return try LinuxScreenshot.capture(target: target, to: path) }
+        return try LinuxScreenshot.captureX11Region(target: target, to: path)
+    }
+
+    public func runLiveStream(
+        _ request: LiveStreamRequest,
+        shouldStop: @escaping @Sendable (Int) -> Bool,
+        onFrame: @escaping (StreamFrame, Int) -> Void
+    ) async throws -> Bool {
+        guard LinuxLiveCapture.isAvailable(for: request) else { return false }
+        try LinuxLiveCapture.run(request, shouldStop: shouldStop, onFrame: onFrame)
+        return true
+    }
+
     public func defaultScreenshotPath() -> String { "artifacts/screenshot.png" }
 
     public func findText(in target: AppTarget?, query: String, exact: Bool, limit: Int) throws -> [OCRMatch] {

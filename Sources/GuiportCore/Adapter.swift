@@ -80,6 +80,17 @@ public protocol DesktopAdapter: Sendable {
     // MARK: - Capture / OCR
 
     func captureScreenshot(target: AppTarget?, to path: String) throws -> ScreenshotResult
+    /// With `includeOverlays`, capture the target window's region of the screen
+    /// (other apps' floating panels included) instead of the window alone.
+    func captureScreenshot(target: AppTarget?, to path: String, includeOverlays: Bool) throws -> ScreenshotResult
+    /// Stream frames from one long-lived capture session until `shouldStop`
+    /// returns true. Returns false when this platform or request has no
+    /// persistent session; `guiport stream` then captures frame by frame.
+    func runLiveStream(
+        _ request: LiveStreamRequest,
+        shouldStop: @escaping @Sendable (Int) -> Bool,
+        onFrame: @escaping (StreamFrame, Int) -> Void
+    ) async throws -> Bool
     func defaultScreenshotPath() -> String
     func findText(in target: AppTarget?, query: String, exact: Bool, limit: Int) throws -> [OCRMatch]
 
@@ -90,6 +101,19 @@ public protocol DesktopAdapter: Sendable {
 
 // Convenience overloads with defaults — Swift protocols can't carry default args directly.
 public extension DesktopAdapter {
+    func captureScreenshot(target: AppTarget?, to path: String, includeOverlays: Bool) throws -> ScreenshotResult {
+        guard includeOverlays, target != nil else { return try captureScreenshot(target: target, to: path) }
+        throw GuiportError(code: "overlays_unsupported",
+                           message: "--with-overlays is not supported on \(platformName)",
+                           hint: "Omit --app to capture the whole screen, which includes overlays.")
+    }
+    func runLiveStream(
+        _ request: LiveStreamRequest,
+        shouldStop: @escaping @Sendable (Int) -> Bool,
+        onFrame: @escaping (StreamFrame, Int) -> Void
+    ) async throws -> Bool {
+        false
+    }
     func resolveApp(name: String?) throws -> AppTarget {
         try resolveApp(name: name, windowTitle: nil)
     }
