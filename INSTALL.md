@@ -18,12 +18,9 @@ Prebuilt binaries for all three platforms are attached to every [release](https:
 brew install edihasaj/guiport/guiport
 ```
 
-Or tap first, then install:
-
-```sh
-brew tap edihasaj/guiport
-brew install guiport
-```
+Use the full name: Homebrew 7+ trusts a third-party formula installed that
+way, but refuses `brew tap edihasaj/guiport && brew install guiport` until you
+run `brew trust --tap edihasaj/guiport`.
 
 Ships a universal (arm64 + x86_64), Developer-ID-signed `guiport.app` from the
 [`edihasaj/homebrew-guiport`](https://github.com/edihasaj/homebrew-guiport)
