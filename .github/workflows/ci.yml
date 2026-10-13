@@ -131,6 +131,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - name: Verify explicit native-runner policy
+        run: python3 scripts/test-ci-native-policy.py
       - name: Trailing whitespace + tabs
         run: |
           ! grep -RIn --include='*.swift' --include='*.md' --include='*.yml' --include='*.yaml' \
