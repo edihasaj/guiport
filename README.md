@@ -26,6 +26,11 @@ Linux ships a standalone binary (static Swift stdlib, glibc 2.35+) with the same
 
 Prebuilt binaries for all three platforms are attached to every [release](https://github.com/edihasaj/guiport/releases/latest).
 
+Hosted CI keeps Linux and Windows checks on routine development pushes and pull
+requests. The paid macOS lane is intentional: it runs for `production` changes,
+or through **Actions → CI → Run workflow** with **Run the paid macOS build and
+unit-test lane** selected. See [the release guide](docs/RELEASING.md#hosted-native-ci).
+
 ### Support matrix
 
 Which verbs work on each platform today. Pending verbs don't crash — they exit

@@ -1,11 +1,10 @@
 name: Release
 
-# Auto-bumps Version.swift patch on every push to main that *isn't* itself a
-# release commit. Tags + pushes back so each merge produces a real
-# `v0.x.y` we can attach artifacts to without manual bookkeeping.
+# An intentional manual release bumps Version.swift, tags it, and publishes the
+# signed artifacts. Routine development pushes must not spend a hosted macOS
+# runner or create a release.
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: release-${{ github.ref }}
@@ -13,9 +12,12 @@ concurrency:
 
 jobs:
   bump:
-    # Skip our own bump commits (pushed by github-actions[bot] via this
-    # same workflow — would otherwise loop forever).
-    if: "github.actor != 'github-actions[bot]'"
+    # Releases are cut deliberately from main. The bot guard retains the old
+    # loop protection for any future reuse of this workflow.
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     permissions:
       contents: write

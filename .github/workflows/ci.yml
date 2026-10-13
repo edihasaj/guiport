@@ -2,9 +2,16 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, production]
   pull_request:
-    branches: [main]
+    branches: [main, production]
+  workflow_dispatch:
+    inputs:
+      run_native:
+        description: Run the paid macOS build and unit-test lane.
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -13,6 +20,12 @@ concurrency:
 jobs:
   build-test-macos:
     name: build + test (macOS)
+    # Native runners are intentional: a manual opt-in or a production change.
+    # Keep this separate from the normal Linux/Windows development CI lanes.
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.run_native) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/production') ||
+      (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'production')
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4

@@ -1,11 +1,13 @@
 # Releasing
 
-Releases are **fully automated** by `.github/workflows/release.yml`. You do not
-hand-edit `Version.swift` or cut tags manually.
+Releases are intentionally started with **Run workflow** for
+`.github/workflows/release.yml`, selecting `main`. You do not hand-edit
+`Version.swift` or cut tags manually. Routine pushes and pull requests never
+start a hosted macOS release job.
 
 ## Flow
 
-Every push to `main` that is **not** itself a `chore(release):` bump commit:
+When an owner intentionally dispatches the Release workflow from `main`:
 
 1. **bump** job — increments the patch in `Sources/GuiportCore/Version.swift`,
    commits `chore(release): vX.Y.Z`, tags `vX.Y.Z`, pushes both to `main`.
@@ -16,9 +18,17 @@ Every push to `main` that is **not** itself a `chore(release):` bump commit:
    (`edihasaj/homebrew-guiport`) to install the bundle + symlink `bin/guiport`
    into it.
 
-So: merge to `main` → a new signed release + `brew upgrade guiport` within minutes.
-The bot's own bump commit is skipped by an `actor != github-actions[bot]` guard,
-so it never loops.
+So: **Actions → Release → Run workflow → main** → a new signed release +
+`brew upgrade guiport` within minutes. The workflow is also guarded to release
+only from `main`; the bot guard prevents loops if its event policy changes later.
+
+## Hosted native CI
+
+Normal `main` pushes and pull requests retain Linux and Windows CI, but skip the
+paid macOS lane. The macOS lane runs only for a push to `production`, a pull
+request targeting `production`, or an intentional **Run workflow** invocation
+of CI with **Run the paid macOS build and unit-test lane** enabled. A skipped
+lane is not native proof; use the explicit path before promotion or release.
 
 ## Code signing (required for a stable Screen Recording identity)
 
