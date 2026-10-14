@@ -5,6 +5,15 @@ name: Release
 # runner or create a release.
 on:
   workflow_dispatch:
+    inputs:
+      run_native:
+        description: Explicitly authorize paid Apple packaging from production
+        type: boolean
+        default: false
+      publish:
+        description: Explicitly authorize version bump and publication
+        type: boolean
+        default: false
 
 concurrency:
   group: release-${{ github.ref }}
@@ -12,11 +21,12 @@ concurrency:
 
 jobs:
   bump:
-    # Releases are cut deliberately from main. The bot guard retains the old
+    # Releases are cut deliberately from production. The bot guard retains the old
     # loop protection for any future reuse of this workflow.
     if: >-
       github.event_name == 'workflow_dispatch' &&
-      github.ref == 'refs/heads/main' &&
+      github.ref == 'refs/heads/production' &&
+      inputs.run_native == true && inputs.publish == true &&
       github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     permissions:
@@ -56,7 +66,7 @@ jobs:
           git add Sources/GuiportCore/Version.swift
           git commit -m "chore(release): v${NEXT}"
           git tag "v${NEXT}"
-          git push origin HEAD:main
+          git push origin HEAD:production
           git push origin "v${NEXT}"
 
   # Build the universal macOS binary for the freshly-tagged version, attach it
@@ -65,6 +75,7 @@ jobs:
   # pushed by GITHUB_TOKEN does not trigger a fresh `on: push: tags` run.
   release:
     needs: bump
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/production' && inputs.run_native == true && inputs.publish == true
     runs-on: macos-14
     permissions:
       contents: write

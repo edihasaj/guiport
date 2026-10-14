@@ -89,12 +89,14 @@ def evaluate(condition: str, event: dict[str, Any]) -> bool:
         condition,
     )
     expression = re.sub(
-        r"\binputs\.run_native\b",
-        str(bool(event.get("inputs", {}).get("run_native", False))),
+        r"\binputs\.(run_native|publish)\b",
+        lambda match: str(bool(event.get("inputs", {}).get(match.group(1), False))),
         expression,
     )
+    expression = re.sub(r"\btrue\b", "True", expression)
+    expression = re.sub(r"\bfalse\b", "False", expression)
     expression = expression.replace("&&", " and ").replace("||", " or ")
-    tokens = re.findall(r"\(|\)|True|False|and|or|\s+", expression)
+    tokens = re.findall(r"\(|\)|==|!=|True|False|and|or|\s+", expression)
     if "".join(tokens) != expression:
         fail(f"unsupported or unexpanded GitHub expression: {expression!r}")
     return bool(eval(expression, {"__builtins__": {}}, {}))
@@ -157,14 +159,15 @@ def assert_ci_policy(workflow: dict[str, Any]) -> None:
         Case("main push", event("push", ref="refs/heads/main"), False),
         Case("master push", event("push", ref="refs/heads/master"), False),
         Case("feature push", event("push", ref="refs/heads/feature/policy"), False),
-        Case("production push", event("push", ref="refs/heads/production"), True),
+        Case("production push", event("push", ref="refs/heads/production"), False),
         Case("normal PR", event("pull_request", pull_request={"base": {"ref": "main"}}), False),
         Case("master PR", event("pull_request", pull_request={"base": {"ref": "master"}}), False),
         Case("dev PR", event("pull_request", pull_request={"base": {"ref": "dev"}}), False),
         Case("integration PR", event("pull_request", pull_request={"base": {"ref": "integration"}}), False),
-        Case("production PR", event("pull_request", pull_request={"base": {"ref": "production"}}), True),
+        Case("production PR", event("pull_request", pull_request={"base": {"ref": "production"}}), False),
         Case("manual native false", event("workflow_dispatch", inputs={"run_native": False}), False),
-        Case("manual native true", event("workflow_dispatch", inputs={"run_native": True}), True),
+        Case("manual native true", event("workflow_dispatch", ref="refs/heads/production", inputs={"run_native": True}), True),
+        Case("manual main opt-in", event("workflow_dispatch", ref="refs/heads/main", inputs={"run_native": True}), False),
         Case("tag push", event("push", ref="refs/tags/v9.9.9"), False),
         Case("schedule", event("schedule"), False),
         Case("merge queue", event("merge_group"), False),
@@ -179,7 +182,9 @@ def assert_ci_policy(workflow: dict[str, Any]) -> None:
 def assert_release_policy(workflow: dict[str, Any]) -> None:
     condition = job_condition(workflow, "bump")
     release_cases = (
-        Case("manual release from main", event("workflow_dispatch", ref="refs/heads/main", actor="edi"), True),
+        Case("manual release from main", event("workflow_dispatch", ref="refs/heads/main", actor="edi", inputs={"run_native": True, "publish": True}), False),
+        Case("confirmed production release", event("workflow_dispatch", ref="refs/heads/production", actor="edi", inputs={"run_native": True, "publish": True}), True),
+        Case("default production release", event("workflow_dispatch", ref="refs/heads/production", actor="edi"), False),
         Case("manual release from feature", event("workflow_dispatch", ref="refs/heads/feature/policy", actor="edi"), False),
         Case("bot release", event("workflow_dispatch", ref="refs/heads/main", actor="github-actions[bot]"), False),
         # Protect this even if a later edit introduces a scheduled trigger.

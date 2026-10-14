@@ -2,6 +2,8 @@
   <img src="assets/logo.svg" width="520" alt="guiport"/>
 </p>
 
+For paused native builds and explicit production requests, see [CI cost policy](docs/ci-cost-policy.md).
+
 <p align="center"><em>Playwright for desktop apps, built for coding agents.</em></p>
 <p align="center"><strong>Available on macOS · Windows · Linux.</strong></p>
 
@@ -27,8 +29,8 @@ Linux ships a standalone binary (static Swift stdlib, glibc 2.35+) with the same
 Prebuilt binaries for all three platforms are attached to every [release](https://github.com/edihasaj/guiport/releases/latest).
 
 Hosted CI keeps Linux and Windows checks on routine development pushes and pull
-requests. The paid macOS lane is intentional: it runs for `production` changes,
-or through **Actions → CI → Run workflow** with **Run the paid macOS build and
+requests. The paid macOS lane is manual-only: select `production`
+through **Actions → CI → Run workflow** with **Run the paid macOS build and
 unit-test lane** selected. See [the release guide](docs/RELEASING.md#hosted-native-ci).
 
 ### Support matrix

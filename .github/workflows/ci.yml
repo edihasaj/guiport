@@ -23,9 +23,9 @@ jobs:
     # Native runners are intentional: a manual opt-in or a production change.
     # Keep this separate from the normal Linux/Windows development CI lanes.
     if: >-
-      (github.event_name == 'workflow_dispatch' && inputs.run_native) ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/production') ||
-      (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'production')
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/production' &&
+      inputs.run_native == true
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
