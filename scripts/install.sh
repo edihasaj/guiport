@@ -7,6 +7,8 @@ REPO="https://github.com/edihasaj/guiport.git"
 PREFIX="${PREFIX:-/usr/local}"
 BIN_DIR="$PREFIX/bin"
 WORK_DIR="$(mktemp -d)"
+MACOS_IDENTITY="${GUIPORT_SIGNING_IDENTITY:-}"
+MACOS_APP_DEST="${GUIPORT_APP_DEST:-/Applications}"
 
 UNAME_S="$(uname -s)"
 
@@ -49,12 +51,14 @@ swift build -c release
 BIN_SRC=".build/release/guiport"
 [ -f "$BIN_SRC" ] || die "Build did not produce $BIN_SRC"
 
-install_bare=0
 if [ "$UNAME_S" = "Darwin" ]; then
-  say "Building signed guiport.app wrapper…"
+  say "Building Developer-ID-signed guiport.app wrapper…"
   # Install the .app, then point bin/guiport INSIDE it so the running process is
   # bundle-associated (real logo + stable TCC identity), instead of a bare binary.
-  app_line="$(scripts/install-macos-app.sh --bin "$BIN_SRC" 2>/dev/null | grep '^installed app: ' || true)"
+  app_line="$(scripts/install-macos-app.sh \
+    --bin "$BIN_SRC" \
+    --dest "$MACOS_APP_DEST" \
+    --identity "$MACOS_IDENTITY" | grep '^installed app: ' || true)"
   app_path="${app_line#installed app: }"
   app_exe="$app_path/Contents/MacOS/guiport"
   if [ -n "$app_path" ] && [ -x "$app_exe" ]; then
@@ -66,15 +70,9 @@ if [ "$UNAME_S" = "Darwin" ]; then
     fi
     say "guiport runs from inside guiport.app — real logo + stable TCC identity."
   else
-    warn "Could not build guiport.app wrapper; installing the bare CLI instead."
-    warn "Permission panes may show a generic icon and grants may reset on updates."
-    install_bare=1
+    die "Could not build a Developer-ID-signed guiport.app. Existing installations were left unchanged. Use Homebrew or a signed release; for a source install set GUIPORT_SIGNING_IDENTITY to your Developer ID Application identity."
   fi
 else
-  install_bare=1
-fi
-
-if [ "$install_bare" = "1" ]; then
   say "Installing to $BIN_DIR/guiport (sudo may prompt)…"
   if [ -w "$BIN_DIR" ]; then
     cp "$BIN_SRC" "$BIN_DIR/guiport"

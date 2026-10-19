@@ -104,6 +104,13 @@ survives upgrades. For source builds, run `scripts/install-macos-app.sh` before
 granting permissions so macOS sees one stable app identity instead of a new
 bare binary per build.
 
+When you install the Aqua input agent, guiport verifies that its running binary
+is inside that exact signed app, registers the bundle with macOS, and associates
+the Login Item with `com.edihasaj.guiport`. System Settings can then show
+**Guiport** and its bundled icon instead of the signing company or a generic
+shell/runtime name. An unverified or bare CLI remains usable, but it is not
+assigned an app identity.
+
 Windows (input/screenshot/apps/UIA tree) — grab the prebuilt `guiport-<ver>-windows-x64.zip` from [releases](https://github.com/edihasaj/guiport/releases/latest), or install from source:
 
 ```powershell

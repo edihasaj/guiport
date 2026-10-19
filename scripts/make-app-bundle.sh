@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Assemble (and sign) a guiport.app bundle around an already-built CLI binary.
+# Assemble a distribution-signed guiport.app bundle around an already-built CLI
+# binary.
 #
 # Why a bundle: a bare CLI binary has no app identity, so macOS shows the generic
 # executable icon in the Privacy & Security panes and keys the TCC grant to a
@@ -35,9 +36,8 @@ Required:
 Options:
   --icon <path>       .icns icon        (default: assets/icon.icns)
   --plist <path>      Info.plist source (default: Resources/Info.plist)
-  --identity <id>     codesign identity (default: "-" ad-hoc). Pass a
-                      "Developer ID Application: …" identity for a stable,
-                      upgrade-surviving TCC grant.
+  --identity <name>   required "Developer ID Application: …" identity. The
+                      distribution bundle is never ad-hoc signed.
   --id <bundle-id>    bundle identifier (default: com.edihasaj.guiport)
   --version <x.y.z>   CFBundle version   (default: `<bin> --version`)
 EOF
@@ -57,20 +57,34 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-[ -n "$BIN" ] && [ -f "$BIN" ] || { echo "missing --bin (built guiport binary)" >&2; exit 1; }
-[ -n "$OUT" ] || { echo "missing --out (destination .app path)" >&2; exit 1; }
-[ -f "$ICON" ] || { echo "missing icon: $ICON" >&2; exit 1; }
-[ -f "$PLIST" ] || { echo "missing Info.plist: $PLIST" >&2; exit 1; }
+die() { echo "make-app-bundle: $*" >&2; exit 1; }
+
+[ -n "$BIN" ] && [ -f "$BIN" ] || die "missing --bin (built guiport binary)"
+[ -n "$OUT" ] || die "missing --out (destination .app path)"
+[ -f "$ICON" ] || die "missing icon: $ICON"
+[ -f "$PLIST" ] || die "missing Info.plist: $PLIST"
+[ -n "$IDENTITY" ] || die "missing --identity; use a Developer ID Application identity"
+[ "$IDENTITY" != "-" ] || die "ad-hoc signing is not permitted for distribution bundles"
+case "$IDENTITY" in
+  "Developer ID Application: "*) ;;
+  *) die "identity must be a Developer ID Application identity" ;;
+esac
+[ "$BUNDLE_ID" = "com.edihasaj.guiport" ] ||
+  die "distribution bundle identifier must be com.edihasaj.guiport"
+[ ! -e "$OUT" ] || die "destination already exists; refusing to replace $OUT"
 
 if [ -z "$VERSION" ]; then
   VERSION="$("$BIN" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo 0.0.0)"
 fi
 
-PB=/usr/libexec/PlistBuddy
+PB="${PLISTBUDDY:-/usr/libexec/PlistBuddy}"
 APP="$OUT"
 
-# Rebuild from scratch so a stale bundle can't leak an old binary/icon/signature.
-rm -rf "$APP"
+# Claim a new destination only after every input and signing-identity check
+# passes. Never delete or replace an existing app: installers retain the prior
+# working bundle until a separately verified release can take its place.
+mkdir -p "$(dirname "$APP")"
+mkdir "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cp "$BIN" "$APP/Contents/MacOS/guiport"
@@ -91,14 +105,12 @@ plist_set CFBundleShortVersionString "$VERSION" string
 plist_set CFBundleVersion "$VERSION" string
 plist_set LSMinimumSystemVersion 13.0 string
 
-# Sign: Developer ID (hardened runtime + timestamp) when an identity is given,
-# else ad-hoc with the stable identifier so entries at least group by name.
-if [ -z "$IDENTITY" ] || [ "$IDENTITY" = "-" ]; then
-  codesign --force --sign - --identifier "$BUNDLE_ID" "$APP"
-else
-  codesign --force --options runtime --timestamp \
-    --sign "$IDENTITY" --identifier "$BUNDLE_ID" "$APP"
-fi
-codesign --verify --strict --verbose=2 "$APP"
+# The same designated requirement is enforced by the release gate and the
+# Swift Login Item association. This rejects Apple Development, ad-hoc, and
+# unrelated Developer ID identities before a bundle can be distributed.
+REQUIREMENT='anchor apple generic and identifier "com.edihasaj.guiport" and certificate leaf[subject.OU] = "T8J48M4QVY" and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate 1[field.1.2.840.113635.100.6.2.6] exists'
+codesign --force --options runtime --timestamp \
+  --sign "$IDENTITY" --identifier "$BUNDLE_ID" "$APP"
+codesign --verify --strict --deep --verbose=2 -R="$REQUIREMENT" "$APP"
 
 echo "built: $APP  (id=$BUNDLE_ID version=$VERSION)"

@@ -1,6 +1,10 @@
 import ArgumentParser
 import Foundation
 import GuiportCore
+#if os(macOS)
+import CoreServices
+import Security
+#endif
 
 /// Manage the Aqua-session input agent — the LaunchAgent + daemon that lets a
 /// background process (coding agent, SSH shell, CI runner) deliver clicks and
@@ -53,64 +57,90 @@ struct AgentCommand: AsyncParsableCommand {
         return resolved
     }
 
-    /// Render the LaunchAgent plist XML.
-    ///
-    /// `AssociatedBundleIdentifiers` is the key that makes the job show up in
-    /// System Settings → General → Login Items *as guiport* rather than as a
-    /// nameless background item: per the `launchd.plist` man page, it "indicates
-    /// which bundles are associated with this job in the System Settings Login
-    /// Items UI", and a legacy plist installed by an app "should include this key
-    /// with a value of the app's bundle identifier". Without it launchd has no
-    /// bundle to attribute the job to, so the entry is anonymous and the user
-    /// cannot tell what it belongs to — or toggle it off.
-    ///
-    /// Pure — no `NSHomeDirectory()`, no filesystem access, no `launchctl` — so
-    /// tests can parse the result with `PropertyListSerialization` instead of
-    /// installing an agent. `writePlist()` is the only writer.
-    static func plistXML(executablePath: String, homePath: String) -> String {
-        let bin = xmlEscape(executablePath)
-        let logPath = xmlEscape((homePath as NSString).appendingPathComponent(".guiport/agent.log"))
-        return """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-          <key>Label</key><string>\(xmlEscape(label))</string>
-          <key>AssociatedBundleIdentifiers</key>
-          <array>
-            <string>\(xmlEscape(bundleIdentifier))</string>
-          </array>
-          <key>ProgramArguments</key>
-          <array>
-            <string>\(bin)</string>
-            <string>agent-daemon</string>
-          </array>
-          <key>RunAtLoad</key><true/>
-          <key>KeepAlive</key><true/>
-          <key>ProcessType</key><string>Interactive</string>
-          <key>StandardErrorPath</key><string>\(logPath)</string>
-        </dict>
-        </plist>
-        """
+    static func resolvedExecutableURL() -> URL {
+        Bundle.main.executableURL?.resolvingSymlinksInPath().standardizedFileURL
+            ?? URL(fileURLWithPath: CommandLine.arguments.first ?? "guiport")
+                .resolvingSymlinksInPath()
+                .standardizedFileURL
     }
 
-    /// Escape a value for plist XML. Home and install paths are plain POSIX
-    /// paths, but a username may legitimately contain `&` — unescaped, that
-    /// produces a plist launchd refuses to parse at all.
-    static func xmlEscape(_ value: String) -> String {
-        value
-            .replacingOccurrences(of: "&", with: "&amp;")
-            .replacingOccurrences(of: "<", with: "&lt;")
-            .replacingOccurrences(of: ">", with: "&gt;")
+    static func backgroundOwner() -> BackgroundAppOwner? {
+        #if os(macOS)
+        return BackgroundAppOwnership.verifiedAndRegistered(
+            executableURL: resolvedExecutableURL(),
+            expectedBundleIdentifier: bundleIdentifier,
+            verifySignature: verifyGuiportSignature,
+            registerWithLaunchServices: registerWithLaunchServices
+        )
+        #else
+        return nil
+        #endif
+    }
+
+    #if os(macOS)
+    /// Accept only Guiport's stable Developer ID identity, never an arbitrary
+    /// nearby `.app` bundle supplied through PATH or a symlink.
+    private static func verifyGuiportSignature(bundleURL: URL) -> Bool {
+        var code: SecStaticCode?
+        guard SecStaticCodeCreateWithPath(bundleURL as CFURL, [], &code) == errSecSuccess,
+              let code else {
+            return false
+        }
+        let requirementText = """
+        anchor apple generic and identifier "com.edihasaj.guiport" and certificate leaf[subject.OU] = "T8J48M4QVY" and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate 1[field.1.2.840.113635.100.6.2.6] exists
+        """
+        var requirement: SecRequirement?
+        guard SecRequirementCreateWithString(requirementText as CFString, [], &requirement) == errSecSuccess,
+              let requirement else {
+            return false
+        }
+        return SecStaticCodeCheckValidity(
+            code,
+            SecCSFlags(rawValue: kSecCSStrictValidate),
+            requirement
+        ) == errSecSuccess
+    }
+
+    private static func registerWithLaunchServices(bundleURL: URL) -> Bool {
+        LSRegisterURL(bundleURL as CFURL, true) == noErr
+    }
+    #endif
+
+    /// A background job has an app association only after the exact owning
+    /// bundle passed its layout, Developer ID, and LaunchServices checks.
+    static func launchAgentPlist(
+        binaryPath: String,
+        owner: BackgroundAppOwner?,
+        homePath: String = NSHomeDirectory()
+    ) -> [String: Any] {
+        let plist: [String: Any] = [
+            "Label": label,
+            "ProgramArguments": [binaryPath, "agent-daemon"],
+            "RunAtLoad": true,
+            "KeepAlive": true,
+            "ProcessType": "Interactive",
+            "StandardErrorPath": "\(homePath)/.guiport/agent.log",
+        ]
+        return BackgroundAppOwnership.associating(plist, with: owner)
     }
 
     /// Write the LaunchAgent plist for the current binary. Idempotent — both
     /// `install` and `restart` call it so an upgraded install re-points itself.
     static func writePlist() throws {
-        let plist = plistXML(executablePath: guiportPath(), homePath: NSHomeDirectory())
+        let bin = guiportPath()
+        let plist = launchAgentPlist(
+            binaryPath: bin,
+            owner: backgroundOwner(),
+            homePath: NSHomeDirectory()
+        )
+        let data = try PropertyListSerialization.data(
+            fromPropertyList: plist,
+            format: .xml,
+            options: 0
+        )
         let dir = (plistPath as NSString).deletingLastPathComponent
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-        try plist.write(toFile: plistPath, atomically: true, encoding: .utf8)
+        try data.write(to: URL(fileURLWithPath: plistPath), options: .atomic)
     }
 
     static func currentUID() -> String {
