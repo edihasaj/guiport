@@ -71,7 +71,8 @@ public final class StreamControl: @unchecked Sendable {
     }
 
     public func startWatchdog(onStall: @escaping @Sendable () -> Void) {
-        let source = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "guiport.stream-control"))
+        let source = DispatchSource.makeTimerSource(queue: DispatchQueue(
+            label: "guiport.stream-control", autoreleaseFrequency: .workItem))
         source.schedule(deadline: .now(), repeating: .milliseconds(100))
         source.setEventHandler { [weak self] in
             if self?.needsForcedExit() == true { onStall() }

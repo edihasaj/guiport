@@ -142,6 +142,14 @@ struct StreamCommand: AsyncParsableCommand {
     }
 
     private func emitFrame(_ frame: StreamFrame, sequence: Int) {
+        #if canImport(ObjectiveC)
+        autoreleasepool { writeFrameEvent(frame, sequence: sequence) }
+        #else
+        writeFrameEvent(frame, sequence: sequence)
+        #endif
+    }
+
+    private func writeFrameEvent(_ frame: StreamFrame, sequence: Int) {
         #if canImport(GuiportMacAdapter)
         // The overlay lifetime now matches the stream lifetime. No separate
         // demo/start command is needed, and the physical cursor remains live.
@@ -194,4 +202,3 @@ struct StreamCommand: AsyncParsableCommand {
         FileHandle.standardOutput.write(Data("\n".utf8))
     }
 }
-

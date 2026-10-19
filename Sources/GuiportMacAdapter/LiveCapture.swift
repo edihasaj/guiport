@@ -51,7 +51,8 @@ public enum LiveCapture {
         var archive = StreamArchiveBudget()
         // A static/minimized app may produce no frames. Wake the iterator when
         // its duration/Stop predicate changes instead of waiting for a new frame.
-        let monitor = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "guiport.stream-idle-stop"))
+        let monitor = DispatchSource.makeTimerSource(queue: DispatchQueue(
+            label: "guiport.stream-idle-stop", autoreleaseFrequency: .workItem))
         monitor.schedule(deadline: .now(), repeating: .milliseconds(100))
         monitor.setEventHandler {
             if shouldStop(receiver.deliveredFrames) { receiver.finish() }
