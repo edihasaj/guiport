@@ -29,15 +29,15 @@ public enum LiveCapture {
         let (target, fps, withOverlays, output, framesDir) =
             (request.target, request.fps, request.withOverlays, request.output, request.framesDir)
         try Doctor.ensureScreenRecordingOrThrow()
-        let (filter, sourceRect, pointSize, scope) = try await contentFilter(target: target, withOverlays: withOverlays)
-        let scale = NSScreen.main?.backingScaleFactor ?? 2
+        let (filter, sourceRect, sourcePixels, scope) = try await contentFilter(target: target, withOverlays: withOverlays)
+        let dimensions = try StreamGeometry.dimensions(width: sourcePixels.width, height: sourcePixels.height)
         let config = SCStreamConfiguration()
         config.minimumFrameInterval = CMTime(seconds: 1 / fps, preferredTimescale: 600)
-        config.queueDepth = 5
+        config.queueDepth = 3
         config.showsCursor = false
         config.pixelFormat = kCVPixelFormatType_32BGRA
-        config.width = Int(pointSize.width * scale)
-        config.height = Int(pointSize.height * scale)
+        config.width = dimensions.width
+        config.height = dimensions.height
         if let sourceRect { config.sourceRect = sourceRect }
         if scope == "window" { config.ignoreShadowsSingleWindow = true }
 
@@ -45,24 +45,39 @@ public enum LiveCapture {
         let stream = SCStream(filter: filter, configuration: config, delegate: receiver)
         try stream.addStreamOutput(receiver, type: .screen, sampleHandlerQueue: receiver.queue)
         try await stream.startCapture()
-        defer { Task { try? await stream.stopCapture() } }
+        var stopped = false
+        defer { if !stopped { Task { try? await stream.stopCapture() } } }
         var sequence = 0
+        var archive = StreamArchiveBudget()
+        // A static/minimized app may produce no frames. Wake the iterator when
+        // its duration/Stop predicate changes instead of waiting for a new frame.
+        let monitor = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "guiport.stream-idle-stop"))
+        monitor.schedule(deadline: .now(), repeating: .milliseconds(100))
+        monitor.setEventHandler {
+            if shouldStop(receiver.deliveredFrames) { receiver.finish() }
+        }
+        monitor.resume()
+        defer { monitor.cancel() }
         for try await (image, capturedAt) in receiver.images {
             if shouldStop(sequence) { break }
-            try writeAtomically(image, to: output)
+            try autoreleasepool { try writeAtomically(image, to: output) }
             sequence += 1
+            receiver.delivered(sequence)
             var archived: String?
             if let framesDir {
+                try archive.reserveFile(at: output)
                 let path = StreamArchive.path(in: framesDir, sequence: sequence, capturedAt: capturedAt)
-                try writePNG(image, to: path)
+                // Reuse the already encoded PNG; don't retain/encode a second
+                // full-size bitmap for an archive copy.
+                try FileManager.default.copyItem(atPath: output, toPath: path)
                 archived = path
             }
             onFrame(StreamFrame(path: output, archivedPath: archived, width: image.width, height: image.height,
                                 scope: scope, capturedAt: capturedAt), sequence)
             if shouldStop(sequence) { break }
         }
-        try? await stream.stopCapture()
-        if let error = receiver.failure { throw error }
+        try await stream.stopCapture()
+        stopped = true
     }
 
     private static func contentFilter(
@@ -70,13 +85,15 @@ public enum LiveCapture {
     ) async throws -> (SCContentFilter, CGRect?, CGSize, String) {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         guard let target else {
-            let mainID = NSScreen.main?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+            let mainID = CGMainDisplayID()
             guard let display = content.displays.first(where: { $0.displayID == mainID }) ?? content.displays.first else {
                 throw GuiportError(code: "capture_failed", message: "no shareable display",
                                    hint: "Grant Screen Recording permission and retry.")
             }
-            return (SCContentFilter(display: display, excludingWindows: []), nil,
-                    CGSize(width: display.width, height: display.height), "screen")
+            let filter = SCContentFilter(display: display, excludingWindows: [])
+            let scale = CGFloat(filter.pointPixelScale)
+            return (filter, nil, CGSize(width: filter.contentRect.width * scale,
+                                       height: filter.contentRect.height * scale), "screen")
         }
         guard let info = Screenshot.topWindowInfo(for: target.pid, titleHint: target.windowTitleHint),
               let window = content.windows.first(where: { $0.windowID == CGWindowID(info.windowNumber) }) else {
@@ -84,7 +101,10 @@ public enum LiveCapture {
                                hint: "Omit --app to stream the whole screen.")
         }
         guard withOverlays else {
-            return (SCContentFilter(desktopIndependentWindow: window), nil, window.frame.size, "window")
+            let filter = SCContentFilter(desktopIndependentWindow: window)
+            let scale = CGFloat(filter.pointPixelScale)
+            return (filter, nil, CGSize(width: filter.contentRect.width * scale,
+                                       height: filter.contentRect.height * scale), "window")
         }
         // Display coordinates are global points with a top-left origin, like the
         // window frame, so the window's rectangle on its display is a subtraction.
@@ -93,7 +113,9 @@ public enum LiveCapture {
         }
         let region = window.frame.intersection(display.frame)
             .offsetBy(dx: -display.frame.minX, dy: -display.frame.minY)
-        return (SCContentFilter(display: display, excludingWindows: []), region, region.size, "region")
+        let filter = SCContentFilter(display: display, excludingWindows: [])
+        let scale = CGFloat(filter.pointPixelScale)
+        return (filter, region, CGSize(width: region.width * scale, height: region.height * scale), "region")
     }
 
     private static func writeAtomically(_ image: CGImage, to path: String) throws {
@@ -120,29 +142,45 @@ public enum LiveCapture {
 @available(macOS 14.0, *)
 private final class FrameReceiver: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
     let queue = DispatchQueue(label: "guiport.live-capture")
-    private(set) var failure: Error?
+    private let lock = NSLock()
+    private var count = 0
     let images: AsyncThrowingStream<(CGImage, Date), Error>
     private let continuation: AsyncThrowingStream<(CGImage, Date), Error>.Continuation
 
     override init() {
-        (images, continuation) = AsyncThrowingStream.makeStream(bufferingPolicy: .bufferingNewest(2))
+        (images, continuation) = AsyncThrowingStream.makeStream(bufferingPolicy: .bufferingNewest(1))
         super.init()
     }
 
+    var deliveredFrames: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
+
+    func delivered(_ count: Int) {
+        lock.lock()
+        self.count = count
+        lock.unlock()
+    }
+
+    func finish() { continuation.finish() }
+
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
-        guard type == .screen, sampleBuffer.isValid,
-              let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false)
-                as? [[SCStreamFrameInfo: Any]],
-              let statusRaw = attachments.first?[.status] as? Int,
-              SCFrameStatus(rawValue: statusRaw) == .complete,
-              let pixelBuffer = sampleBuffer.imageBuffer else { return }
-        var image: CGImage?
-        VTCreateCGImageFromCVPixelBuffer(pixelBuffer, options: nil, imageOut: &image)
-        if let image { continuation.yield((image, Date())) }
+        autoreleasepool {
+            guard type == .screen, sampleBuffer.isValid,
+                  let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false)
+                    as? [[SCStreamFrameInfo: Any]],
+                  let statusRaw = attachments.first?[.status] as? Int,
+                  SCFrameStatus(rawValue: statusRaw) == .complete,
+                  let pixelBuffer = sampleBuffer.imageBuffer else { return }
+            var image: CGImage?
+            VTCreateCGImageFromCVPixelBuffer(pixelBuffer, options: nil, imageOut: &image)
+            if let image { continuation.yield((image, Date())) }
+        }
     }
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {
-        failure = error
         continuation.finish(throwing: error)
     }
 }

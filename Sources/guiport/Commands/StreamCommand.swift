@@ -1,6 +1,11 @@
 import ArgumentParser
 import Foundation
 import GuiportCore
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 #if canImport(GuiportMacAdapter)
 import GuiportMacAdapter
@@ -31,7 +36,7 @@ struct StreamCommand: AsyncParsableCommand {
     @Option(name: [.customShort("o"), .long], help: "Stable PNG path updated atomically. Defaults to artifacts/.")
     var output: String?
 
-    @Option(name: .long, help: "Also keep every frame as frame-NNNNNN-<epoch ms>.png in this directory.")
+    @Option(name: .long, help: "Also archive frames here, up to 512 MiB per run. Continuous streaming keeps one latest frame by default.")
     var framesDir: String?
 
     @Flag(name: .long, help: "With --app, capture the window's screen region so other apps' overlays are included.")
@@ -41,8 +46,8 @@ struct StreamCommand: AsyncParsableCommand {
         guard (0.1...60).contains(fps) else {
             throw ValidationError("--fps must be between 0.1 and 60")
         }
-        if let seconds, seconds <= 0 {
-            throw ValidationError("--seconds must be greater than zero")
+        if let seconds, !seconds.isFinite || seconds <= 0 {
+            throw ValidationError("--seconds must be finite and greater than zero")
         }
         if let frames, frames <= 0 {
             throw ValidationError("--frames must be greater than zero")
@@ -50,11 +55,22 @@ struct StreamCommand: AsyncParsableCommand {
     }
 
     func run() async throws {
+        let control = StreamControl(seconds: seconds, frames: frames)
+        control.startWatchdog {
+            // Native capture can be idle, blocked in file I/O, or waiting on a
+            // full stdout pipe. Never let that prevent an explicit Stop.
+            #if os(macOS) || os(Linux)
+            _exit(75)
+            #else
+            exit(75)
+            #endif
+        }
+        defer { control.finish() }
+        try control.throwIfCancelled()
         let target: AppTarget? = ScreenshotCommand.targetsWindow(app: app.app, window: app.window)
             ? try Adapter.current.resolveApp(name: app.app, windowTitle: app.window)
             : nil
         let path = output ?? Adapter.current.defaultScreenshotPath()
-        let deadline = seconds.map { Date().addingTimeInterval($0) }
         let limit = frames
         if let framesDir {
             try FileManager.default.createDirectory(atPath: framesDir, withIntermediateDirectories: true)
@@ -69,31 +85,40 @@ struct StreamCommand: AsyncParsableCommand {
 
         // Prefer one long-lived capture session (ScreenCaptureKit on macOS 14+,
         // ffmpeg x11grab on Linux X11); fall back to one capture per frame.
-        let delivered = FrameCounter()
         let request = LiveStreamRequest(target: target, fps: fps, withOverlays: withOverlays,
                                         output: path, framesDir: framesDir)
         let live = try await Adapter.current.runLiveStream(request, shouldStop: { sequence in
+            control.delivered(sequence)
+            if control.stopReason() != nil { return true }
             if let limit, sequence >= limit { return true }
-            return deadline.map { Date() >= $0 } ?? false
+            return false
         }, onFrame: { frame, sequence in
-            delivered.value = sequence
+            control.delivered(sequence)
             emitFrame(frame, sequence: sequence)
         })
         if live {
-            emit(["event": "stopped", "frames": delivered.value, "path": path])
+            try control.throwIfCancelled()
+            emit(["event": "stopped", "frames": control.deliveredFrames, "path": path])
             return
         }
 
         let interval = 1 / fps
         var sequence = 0
-        while deadline.map({ Date() < $0 }) ?? true {
+        var archive = StreamArchiveBudget()
+        while control.stopReason() == nil {
             if let limit, sequence >= limit { break }
             let frameStarted = Date()
-            let result = try captureAtomically(target: target, path: path)
+            let result: ScreenshotResult
+            #if canImport(ObjectiveC)
+            result = try autoreleasepool { try captureAtomically(target: target, path: path) }
+            #else
+            result = try captureAtomically(target: target, path: path)
+            #endif
             let capturedAt = Date()
             sequence += 1
             var archived: String?
             if let framesDir {
+                try archive.reserveFile(at: result.path)
                 let copy = StreamArchive.path(in: framesDir, sequence: sequence, capturedAt: capturedAt)
                 try FileManager.default.copyItem(atPath: result.path, toPath: copy)
                 archived = copy
@@ -101,13 +126,18 @@ struct StreamCommand: AsyncParsableCommand {
             emitFrame(StreamFrame(path: result.path, archivedPath: archived, width: result.width,
                                   height: result.height, scope: result.scope, capturedAt: capturedAt),
                       sequence: sequence)
+            control.delivered(sequence)
 
             let remaining = interval - Date().timeIntervalSince(frameStarted)
             if remaining > 0 {
-                try await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
+                let sleepUntil = ProcessInfo.processInfo.systemUptime + remaining
+                while ProcessInfo.processInfo.systemUptime < sleepUntil, control.stopReason() == nil {
+                    try await Task.sleep(nanoseconds: 50_000_000)
+                }
             }
         }
 
+        try control.throwIfCancelled()
         emit(["event": "stopped", "frames": sequence, "path": path])
     }
 
@@ -165,7 +195,3 @@ struct StreamCommand: AsyncParsableCommand {
     }
 }
 
-/// Frame count shared with the live-stream callback.
-private final class FrameCounter: @unchecked Sendable {
-    var value = 0
-}

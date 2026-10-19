@@ -5,6 +5,8 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Fixed
+- Streams observe duration and Stop conditions while idle, bound pending frame
+  retention and optional archives, and use the capture source's scale.
 - Accessibility inspection now bounds tree size, text, time, depth, and cycles,
   and pages children and windows instead of copying unbounded arrays.
 - A physical-memory watchdog stops runaway macOS processes before they can

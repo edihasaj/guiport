@@ -21,4 +21,12 @@ final class StreamCommandTests: XCTestCase {
         XCTAssertNotEqual(out.code, 0)
         XCTAssertTrue(out.stderr.contains("greater than zero"), out.stderr)
     }
+
+    func testRejectsNonFiniteDurations() throws {
+        for duration in ["nan", "inf", "-inf"] {
+            let out = try CLI.run(["stream", "--seconds=\(duration)"])
+            XCTAssertNotEqual(out.code, 0)
+            XCTAssertTrue(out.stderr.contains("finite and greater than zero"), out.stderr)
+        }
+    }
 }

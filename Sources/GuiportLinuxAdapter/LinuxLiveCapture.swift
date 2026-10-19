@@ -40,11 +40,15 @@ enum LinuxLiveCapture {
         defer { if process.isRunning { process.terminate() } }
 
         var buffer = Data()
+        var archive = StreamArchiveBudget()
         var sequence = 0
         let reader = out.fileHandleForReading
         while !shouldStop(sequence) {
             let chunk = reader.availableData
             if chunk.isEmpty { break }
+            guard chunk.count <= 64 * 1_024 * 1_024 - buffer.count else {
+                throw GuiportError(code: "stream_buffer_limit", message: "Capture exceeded the 64 MiB encoded-frame buffer limit.")
+            }
             buffer.append(chunk)
             while let png = nextPNG(&buffer) {
                 let capturedAt = Date()
@@ -52,6 +56,7 @@ enum LinuxLiveCapture {
                 sequence += 1
                 var archived: String?
                 if let dir = request.framesDir {
+                    try archive.reserve(UInt64(png.count))
                     let path = StreamArchive.path(in: dir, sequence: sequence, capturedAt: capturedAt)
                     try png.write(to: URL(fileURLWithPath: path))
                     archived = path

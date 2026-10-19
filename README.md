@@ -185,6 +185,23 @@ guiport stream --frames 1 -o /tmp/guiport-frame.png
 guiport stream --app TextEdit --with-overlays --fps 30 --frames-dir artifacts/frames
 ```
 
+Streaming remains available continuously at 0.1–60 FPS. On macOS, capture keeps
+three system buffers and one pending frame; a slow consumer receives the latest
+frame as older pending frames are dropped. Capture dimensions use the source's
+own scale and are fitted to an 8,294,400-pixel budget (4K at 16:9).
+
+`--seconds` and Stop/ESC are checked even when the source is idle. A stream gets
+two seconds to finish after a stop condition; if blocked native/file/pipe I/O
+prevents cleanup, an independent guard exits with code 75. The macOS physical
+memory watchdog remains active throughout. No duration limit is imposed when
+`--seconds` is omitted.
+The duration includes capture setup, so a very short limit can finish before
+the first frame arrives.
+
+The default output replaces one latest-frame file. Optional `--frames-dir`
+archives stop at 512 MiB per run with `stream_archive_limit`; existing files are
+preserved. Linux's ffmpeg path also caps its encoded-frame buffer at 64 MiB.
+
 ## Plugins
 
 A **plugin** is a named, reusable flow built from the public primitives —
