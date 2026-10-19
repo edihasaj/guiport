@@ -202,6 +202,12 @@ The default output replaces one latest-frame file. Optional `--frames-dir`
 archives stop at 512 MiB per run with `stream_archive_limit`; existing files are
 preserved. Linux's ffmpeg path also caps its encoded-frame buffer at 64 MiB.
 
+For a bounded native check, run
+`uv run --no-project scripts/smoke-stream-resource-limits.py --binary "$(command -v guiport)"`.
+It tests finite/idle streams, high-rate capture, archives, and a blocked consumer
+under an external memory ceiling. Add `--check-stop` to test the shared Stop
+signal when no other guiport jobs are active.
+
 ## Plugins
 
 A **plugin** is a named, reusable flow built from the public primitives —
