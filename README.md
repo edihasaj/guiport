@@ -345,6 +345,11 @@ The per-process tree cache retains at most eight entries and evicts expired
 trees. If an app exceeds the accessibility limits, use a narrower window or
 selector, or use screenshot/OCR.
 
+The daemon also rejects requests over 1 MiB and incomplete requests after five
+seconds. To verify a running patched daemon without sending input events, run
+`uv run --no-project scripts/smoke-daemon-resource-limits.py`. This check occupies
+the input bridge for five seconds.
+
 - Pure Swift, single binary.
 - `GuiportCore` library: AX bridge, selector engine, input, screenshots, replay runner, MCP server.
 - `guiport` CLI: thin wrapper using swift-argument-parser.
