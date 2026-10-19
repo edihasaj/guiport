@@ -5,6 +5,8 @@ import GuiportCore
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
+#elseif os(Windows)
+import WinSDK
 #endif
 
 #if canImport(GuiportMacAdapter)
@@ -59,10 +61,10 @@ struct StreamCommand: AsyncParsableCommand {
         control.startWatchdog {
             // Native capture can be idle, blocked in file I/O, or waiting on a
             // full stdout pipe. Never let that prevent an explicit Stop.
-            #if os(macOS) || os(Linux)
-            _exit(75)
+            #if os(Windows)
+            _ = TerminateProcess(GetCurrentProcess(), 75)
             #else
-            exit(75)
+            _exit(75)
             #endif
         }
         defer { control.finish() }

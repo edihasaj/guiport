@@ -5,6 +5,8 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Fixed
+- Windows streams use the native process-termination API for the emergency stop,
+  avoiding an ArgumentParser method-name collision during Windows builds.
 - The input LaunchAgent identifies its associated guiport bundle in Login Items,
   and installation paths containing XML characters remain valid.
 - Streams observe duration and Stop conditions while idle, bound pending frame
