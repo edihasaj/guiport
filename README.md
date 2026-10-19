@@ -328,6 +328,23 @@ deliver clicks at all. GUI-session use needs neither it nor any install.)
 
 ## Architecture
 
+### Resource protection
+
+Accessibility walks (`tree`, selector searches, and element relocation) stop
+with a clear error after 5,000 nodes, 1 MiB of scalar text, or 10 seconds.
+Child elements are read in pages of 32, cycles are rejected, and AX messaging
+uses a 0.5-second timeout. `--max-depth` accepts 0 through 60. Limits abort the
+operation rather than returning an incomplete tree for a click.
+
+On macOS, an independent watchdog checks physical memory, including compressed
+memory, every 100 ms. It exits with code 75 and `resource_limit` if guiport
+exceeds 512 MiB, including during daemon and stream sessions. This is a sampled
+ceiling, so brief overshoot is possible. `GUIPORT_MEMORY_LIMIT_MB` can lower the
+ceiling for constrained hosts or testing, but cannot raise or disable it.
+The per-process tree cache retains at most eight entries and evicts expired
+trees. If an app exceeds the accessibility limits, use a narrower window or
+selector, or use screenshot/OCR.
+
 - Pure Swift, single binary.
 - `GuiportCore` library: AX bridge, selector engine, input, screenshots, replay runner, MCP server.
 - `guiport` CLI: thin wrapper using swift-argument-parser.

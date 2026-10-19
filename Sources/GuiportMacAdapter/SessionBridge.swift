@@ -282,7 +282,7 @@ public enum SessionBridge {
             while true {
                 let client = accept(fd, nil, nil)
                 if client < 0 { continue }
-                handleClient(client)
+                autoreleasepool { handleClient(client) }
                 close(client)
             }
         }
@@ -294,14 +294,23 @@ public enum SessionBridge {
     }
 
     private static func handleClient(_ client: Int32) {
+        // A stalled or malformed local client must not monopolize the daemon
+        // or send an unlimited request. Synthetic input payloads are small.
+        let deadline = ProcessInfo.processInfo.systemUptime + 5
         var buf = [UInt8](repeating: 0, count: 8192)
         var collected = [UInt8]()
         while true {
+            let remaining = deadline - ProcessInfo.processInfo.systemUptime
+            guard remaining > 0 else { return }
+            var timeout = timeval(tv_sec: Int(remaining), tv_usec: Int32((remaining - floor(remaining)) * 1_000_000))
+            setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
             let n = read(client, &buf, buf.count)
             if n <= 0 { break }
+            guard collected.count + n <= 1_048_576 else { return }
             collected.append(contentsOf: buf[0..<n])
-            if collected.contains(0x0A) { break }
+            if buf[0..<n].contains(0x0A) { break }
         }
+        guard ProcessInfo.processInfo.systemUptime < deadline else { return }
         guard let nl = collected.firstIndex(of: 0x0A) else { return }
         let line = Data(collected[0..<nl])
         var reply: [String: Any] = ["ok": true]

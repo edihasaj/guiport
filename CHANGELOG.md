@@ -5,6 +5,11 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Fixed
+- Accessibility inspection now bounds tree size, text, time, depth, and cycles,
+  and pages children and windows instead of copying unbounded arrays.
+- A physical-memory watchdog stops runaway macOS processes before they can
+  consume the workstation's memory. Daemon request size and duration and tree
+  cache retention are also bounded.
 - Stopping `guiport stream`, `screenshot` or `record` with a signal now stops
   the capture. These commands re-launch guiport as its own responsible process
   for Screen Recording, and SIGTERM only reached the wrapper, so a script that

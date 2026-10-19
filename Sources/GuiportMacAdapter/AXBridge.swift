@@ -19,18 +19,18 @@ enum AXBridge {
     // MARK: - App-level
 
     static func windowCount(pid: pid_t) -> Int {
-        let appElement = AXUIElementCreateApplication(pid)
-        var value: CFTypeRef?
-        let err = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &value)
-        guard err == .success, let arr = value as? [AXUIElement] else { return 0 }
-        return arr.count
+        let appElement = AXTraversal.application(pid)
+        var count: CFIndex = 0
+        let err = AXUIElementGetAttributeValueCount(appElement, kAXWindowsAttribute as CFString, &count)
+        return err == .success ? count : 0
     }
 
     // MARK: - Observe
 
     static func observe(target: AppTarget) throws -> AXSummary {
+        var budget = TraversalBudget<AXElementIdentity>()
         try requireTrusted()
-        let appElement = AXUIElementCreateApplication(target.pid)
+        let appElement = AXTraversal.application(target.pid)
         let appInfo = AppInfo(
             name: target.name,
             bundleId: target.bundleId,
@@ -39,7 +39,7 @@ enum AXBridge {
             windowCount: windowCount(pid: target.pid)
         )
 
-        let window = focusedOrTitledWindow(in: appElement, titleHint: target.windowTitleHint)
+        let window = try focusedOrTitledWindow(in: appElement, titleHint: target.windowTitleHint, budget: &budget)
         let windowInfo: WindowInfo? = window.flatMap { w in
             WindowInfo(title: stringAttr(w, kAXTitleAttribute as CFString), bounds: bounds(of: w))
         }
@@ -56,10 +56,10 @@ enum AXBridge {
 
         var topLevel = 0
         if let w = window {
-            var childRef: CFTypeRef?
-            if AXUIElementCopyAttributeValue(w, kAXChildrenAttribute as CFString, &childRef) == .success,
-               let arr = childRef as? [AXUIElement] {
-                topLevel = arr.count
+            AXTraversal.prepare(w)
+            var count: CFIndex = 0
+            if AXUIElementGetAttributeValueCount(w, kAXChildrenAttribute as CFString, &count) == .success {
+                topLevel = count
             }
         }
 
@@ -69,13 +69,18 @@ enum AXBridge {
     // MARK: - Tree
 
     static func tree(target: AppTarget, maxDepth: Int = 30, includeHidden: Bool = false, scope: TreeScope = .auto) throws -> AXNode {
+        try TraversalBudget<AXElementIdentity>.validateDepth(maxDepth)
+        var budget = TraversalBudget<AXElementIdentity>()
         try requireTrusted()
-        let appElement = AXUIElementCreateApplication(target.pid)
+        let appElement = AXTraversal.application(target.pid)
         // Coax Chromium/Electron apps into exposing their full AX tree.
         enableElectronAX(appElement)
-        let root = chooseRoot(appElement: appElement, target: target, scope: scope)
+        let root = try chooseRoot(appElement: appElement, target: target, scope: scope, budget: &budget)
         var pathCounter = PathCounter()
-        return walk(root, depth: 0, maxDepth: maxDepth, path: "/", counter: &pathCounter, includeHidden: includeHidden)
+        return try autoreleasepool {
+            try walk(root, depth: 0, maxDepth: maxDepth, path: "/", counter: &pathCounter,
+                     includeHidden: includeHidden, budget: &budget)
+        }
     }
 
     /// Early-exit search for the first node matching `selector`. Walks the raw
@@ -90,15 +95,19 @@ enum AXBridge {
     /// identifier, or description) are skipped from matching — they can't be a
     /// meaningful click target — but their subtrees are still searched.
     static func findFirst(target: AppTarget, selector: GuiportCore.Selector, maxDepth: Int = 30, scope: TreeScope = .auto) throws -> AXNode? {
+        try TraversalBudget<AXElementIdentity>.validateDepth(maxDepth)
+        var budget = TraversalBudget<AXElementIdentity>()
         try requireTrusted()
-        let appElement = AXUIElementCreateApplication(target.pid)
+        let appElement = AXTraversal.application(target.pid)
         enableElectronAX(appElement)
-        let root = chooseRoot(appElement: appElement, target: target, scope: scope)
+        let root = try chooseRoot(appElement: appElement, target: target, scope: scope, budget: &budget)
         var counter = PathCounter()
         var matchOrdinal = 0
-        return walkFirst(root, depth: 0, maxDepth: maxDepth, path: "/",
-                         counter: &counter, selector: selector,
-                         wantIndex: selector.index, matchOrdinal: &matchOrdinal)
+        return try autoreleasepool {
+            try walkFirst(root, depth: 0, maxDepth: maxDepth, path: "/",
+                          counter: &counter, selector: selector,
+                          wantIndex: selector.index, matchOrdinal: &matchOrdinal, budget: &budget)
+        }
     }
 
     private static func walkFirst(_ element: AXUIElement,
@@ -108,8 +117,12 @@ enum AXBridge {
                                   counter: inout PathCounter,
                                   selector: GuiportCore.Selector,
                                   wantIndex: Int?,
-                                  matchOrdinal: inout Int) -> AXNode? {
-        let a = batchFetch(element)
+                                  matchOrdinal: inout Int,
+                                  budget: inout TraversalBudget<AXElementIdentity>) throws -> AXNode? {
+        let identity = AXElementIdentity(element: element)
+        try budget.enter(identity)
+        defer { budget.leave(identity) }
+        let a = try batchFetch(element, budget: &budget)
         let role = cfStr(a[0]) ?? "Unknown"
         let name = cfStr(a[2])
         let value = cfStr(a[3])
@@ -151,14 +164,12 @@ enum AXBridge {
             }
         }
 
-        if depth < maxDepth, let arr = a[12] as? [AXUIElement] {
+        if depth < maxDepth {
             var childCounter = PathCounter()
-            for c in arr {
-                if let hit = walkFirst(c, depth: depth + 1, maxDepth: maxDepth, path: nodePath,
-                                       counter: &childCounter, selector: selector,
-                                       wantIndex: wantIndex, matchOrdinal: &matchOrdinal) {
-                    return hit
-                }
+            return try AXTraversal.children(of: element, budget: &budget) { c, budget in
+                try walkFirst(c, depth: depth + 1, maxDepth: maxDepth, path: nodePath,
+                              counter: &childCounter, selector: selector,
+                              wantIndex: wantIndex, matchOrdinal: &matchOrdinal, budget: &budget)
             }
         }
         return nil
@@ -173,16 +184,17 @@ enum AXBridge {
     /// - `.app`:    the raw application element (top of the tree).
     /// - `.auto`:   window if one exists, otherwise extras menu bar,
     ///              otherwise the app element.
-    private static func chooseRoot(appElement: AXUIElement, target: AppTarget, scope: TreeScope) -> AXUIElement {
+    private static func chooseRoot(appElement: AXUIElement, target: AppTarget, scope: TreeScope,
+                                   budget: inout TraversalBudget<AXElementIdentity>) throws -> AXUIElement {
         switch scope {
         case .window:
-            return focusedOrTitledWindow(in: appElement, titleHint: target.windowTitleHint) ?? appElement
+            return try focusedOrTitledWindow(in: appElement, titleHint: target.windowTitleHint, budget: &budget) ?? appElement
         case .tray:
             return extrasMenuBar(of: appElement) ?? appElement
         case .app:
             return appElement
         case .auto:
-            if let w = focusedOrTitledWindow(in: appElement, titleHint: target.windowTitleHint),
+            if let w = try focusedOrTitledWindow(in: appElement, titleHint: target.windowTitleHint, budget: &budget),
                windowCount(pid: target.pid) > 0 {
                 return w
             }
@@ -219,13 +231,14 @@ enum AXBridge {
     /// resolves nodes that were enumerated under any scope `tree()` may
     /// have used (window vs `--tray`).
     static func locate(in target: AppTarget, id: String) throws -> AXUIElement? {
+        var budget = TraversalBudget<AXElementIdentity>()
         try requireTrusted()
-        let appElement = AXUIElementCreateApplication(target.pid)
+        let appElement = AXTraversal.application(target.pid)
         // Match tree(): coax Chromium/Electron into exposing its AX tree so the
         // path ids we relocate (for AXPress) resolve against the same nodes.
         enableElectronAX(appElement)
         var roots: [AXUIElement] = []
-        if let w = focusedOrTitledWindow(in: appElement, titleHint: target.windowTitleHint) {
+        if let w = try focusedOrTitledWindow(in: appElement, titleHint: target.windowTitleHint, budget: &budget) {
             roots.append(w)
         }
         if let extras = extrasMenuBar(of: appElement) {
@@ -234,7 +247,8 @@ enum AXBridge {
         roots.append(appElement)
         for root in roots {
             var counter = PathCounter()
-            if let hit = walkRaw(root, depth: 0, maxDepth: 60, path: "/", counter: &counter, target: id) {
+            if let hit = try walkRaw(root, depth: 0, maxDepth: 60, path: "/", counter: &counter,
+                                     target: id, budget: &budget) {
                 return hit
             }
         }
@@ -258,30 +272,36 @@ enum AXBridge {
         }
     }
 
-    private static func focusedOrTitledWindow(in appElement: AXUIElement, titleHint: String?) -> AXUIElement? {
+    private static func focusedOrTitledWindow(in appElement: AXUIElement, titleHint: String?,
+                                              budget: inout TraversalBudget<AXElementIdentity>) throws -> AXUIElement? {
         if let hint = titleHint, !hint.isEmpty {
-            var winsRef: CFTypeRef?
-            if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &winsRef) == .success,
-               let wins = winsRef as? [AXUIElement] {
-                let lc = hint.lowercased()
-                if let m = wins.first(where: { (stringAttr($0, kAXTitleAttribute as CFString) ?? "").lowercased().contains(lc) }) {
-                    return m
-                }
+            let match: AXUIElement? = try AXTraversal.values(
+                of: appElement, attribute: kAXWindowsAttribute as CFString, budget: &budget
+            ) { window, budget in
+                let identity = AXElementIdentity(element: window)
+                try budget.enter(identity)
+                defer { budget.leave(identity) }
+                let title = stringAttr(window, kAXTitleAttribute as CFString)
+                try budget.chargeText(title)
+                return (title ?? "").lowercased().contains(hint.lowercased()) ? window : nil
+            }
+            if let match { return match }
+        }
+        for attribute in [kAXFocusedWindowAttribute, kAXMainWindowAttribute] {
+            try budget.checkTime()
+            var ref: CFTypeRef?
+            let error = AXUIElementCopyAttributeValue(appElement, attribute as CFString, &ref)
+            try budget.checkTime()
+            if error == .success, let ref, CFGetTypeID(ref) == AXUIElementGetTypeID() {
+                return (ref as! AXUIElement)
+            }
+            if error != .success && error != .noValue && error != .attributeUnsupported {
+                try AXTraversal.requireSuccess(error)
             }
         }
-        var ref: CFTypeRef?
-        if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &ref) == .success {
-            return ref as! AXUIElement?
+        return try AXTraversal.values(of: appElement, attribute: kAXWindowsAttribute as CFString, budget: &budget) { window, _ in
+            window
         }
-        if AXUIElementCopyAttributeValue(appElement, kAXMainWindowAttribute as CFString, &ref) == .success {
-            return ref as! AXUIElement?
-        }
-        var winsRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &winsRef) == .success,
-           let wins = winsRef as? [AXUIElement], let first = wins.first {
-            return first
-        }
-        return nil
     }
 
     private struct PathCounter {
@@ -294,33 +314,49 @@ enum AXBridge {
         }
     }
 
-    // Attributes (plus children) fetched in ONE batched IPC round-trip per
+    // Scalar attributes fetched in ONE batched IPC round-trip per
     // node via AXUIElementCopyMultipleAttributeValues — vs ~13 separate calls.
     // Order must stay in sync with the indexing in `walk`.
     private static let batchAttrs: CFArray = [
         kAXRoleAttribute, kAXSubroleAttribute, kAXTitleAttribute, kAXValueAttribute,
         kAXIdentifierAttribute, kAXDescriptionAttribute, kAXHelpAttribute,
         kAXPositionAttribute, kAXSizeAttribute, kAXEnabledAttribute,
-        kAXFocusedAttribute, kAXSelectedAttribute, kAXChildrenAttribute,
+        kAXFocusedAttribute, kAXSelectedAttribute,
     ] as CFArray
 
     /// One IPC round-trip for every node attribute we serialize. Missing
     /// attributes arrive as kAXValueAXErrorType placeholders (or kCFNull);
     /// both map to nil. This is the single biggest latency lever for deep
     /// Chromium/Electron trees, where per-attribute IPC dominated.
-    private static func batchFetch(_ element: AXUIElement) -> [CFTypeRef?] {
+    private static func batchFetch(_ element: AXUIElement,
+                                   budget: inout TraversalBudget<AXElementIdentity>) throws -> [CFTypeRef?] {
+        try budget.checkTime()
+        AXTraversal.prepare(element)
         let count = CFArrayGetCount(batchAttrs)
         var out = [CFTypeRef?](repeating: nil, count: count)
         var valuesRef: CFArray?
         let err = AXUIElementCopyMultipleAttributeValues(
             element, batchAttrs, AXCopyMultipleAttributeOptions(rawValue: 0), &valuesRef)
+        try budget.checkTime()
+        if err == .cannotComplete {
+            throw GuiportError(code: "ax_timeout", message: "The app did not respond to an accessibility attribute request.")
+        }
+        try AXTraversal.requireSuccess(err)
         guard err == .success, let values = valuesRef as? [AnyObject], values.count == count else {
             return out
         }
         for (i, v) in values.enumerated() {
             if v is NSNull { continue }
-            if CFGetTypeID(v) == AXValueGetTypeID(), AXValueGetType(v as! AXValue) == .axError { continue }
+            if CFGetTypeID(v) == AXValueGetTypeID(), AXValueGetType(v as! AXValue) == .axError {
+                var error = AXError.success
+                if AXValueGetValue(v as! AXValue, .axError, &error),
+                   error == .cannotComplete || error == .apiDisabled || error == .invalidUIElement {
+                    try AXTraversal.requireSuccess(error, context: "scalar attribute")
+                }
+                continue
+            }
             out[i] = v as CFTypeRef
+            if i < 7 { try budget.chargeText(cfStr(v)) }
         }
         return out
     }
@@ -352,8 +388,12 @@ enum AXBridge {
                              maxDepth: Int,
                              path: String,
                              counter: inout PathCounter,
-                             includeHidden: Bool) -> AXNode {
-        let a = batchFetch(element)
+                             includeHidden: Bool,
+                             budget: inout TraversalBudget<AXElementIdentity>) throws -> AXNode {
+        let identity = AXElementIdentity(element: element)
+        try budget.enter(identity)
+        defer { budget.leave(identity) }
+        let a = try batchFetch(element, budget: &budget)
         let role = cfStr(a[0]) ?? "Unknown"
         let subrole = cfStr(a[1])
         let name = cfStr(a[2])
@@ -366,6 +406,7 @@ enum AXBridge {
         let focused = cfBool(a[10])
         let selected = cfBool(a[11])
         let acts = actions(of: element)
+        try budget.checkTime()
 
         let n = counter.next(parent: path, role: role)
         let segment = "\(role)[\(n)]"
@@ -373,15 +414,16 @@ enum AXBridge {
 
         var children: [AXNode] = []
         if depth < maxDepth {
-            if let arr = a[12] as? [AXUIElement] {
-                var childCounter = PathCounter()
-                for c in arr {
-                    let child = walk(c, depth: depth + 1, maxDepth: maxDepth, path: nodePath, counter: &childCounter, includeHidden: includeHidden)
-                    if !includeHidden, child.bounds == nil, child.children.isEmpty, (child.name?.isEmpty ?? true), (child.value?.isEmpty ?? true) {
-                        continue
-                    }
-                    children.append(child)
+            var childCounter = PathCounter()
+            let _: Bool? = try AXTraversal.children(of: element, budget: &budget) { c, budget in
+                let child = try walk(c, depth: depth + 1, maxDepth: maxDepth, path: nodePath,
+                                     counter: &childCounter, includeHidden: includeHidden, budget: &budget)
+                if !includeHidden, child.bounds == nil, child.children.isEmpty,
+                   (child.name?.isEmpty ?? true), (child.value?.isEmpty ?? true) {
+                    return nil
                 }
+                children.append(child)
+                return nil
             }
         }
 
@@ -408,64 +450,23 @@ enum AXBridge {
                                 maxDepth: Int,
                                 path: String,
                                 counter: inout PathCounter,
-                                target: String) -> AXUIElement? {
+                                target: String,
+                                budget: inout TraversalBudget<AXElementIdentity>) throws -> AXUIElement? {
+        let identity = AXElementIdentity(element: element)
+        try budget.enter(identity)
+        defer { budget.leave(identity) }
         let role = stringAttr(element, kAXRoleAttribute as CFString) ?? "Unknown"
+        try budget.chargeText(role)
         let n = counter.next(parent: path, role: role)
         let segment = "\(role)[\(n)]"
         let nodePath = path == "/" ? "/\(segment)" : "\(path)/\(segment)"
         if nodePath == target { return element }
         if depth >= maxDepth { return nil }
-        var childRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childRef) == .success,
-           let arr = childRef as? [AXUIElement] {
-            var childCounter = PathCounter()
-            for c in arr {
-                if let hit = walkRaw(c, depth: depth + 1, maxDepth: maxDepth, path: nodePath, counter: &childCounter, target: target) {
-                    return hit
-                }
-            }
+        var childCounter = PathCounter()
+        return try AXTraversal.children(of: element, budget: &budget) { c, budget in
+            try walkRaw(c, depth: depth + 1, maxDepth: maxDepth, path: nodePath,
+                        counter: &childCounter, target: target, budget: &budget)
         }
-        return nil
     }
 
-    // MARK: - Attribute helpers
-
-    static func stringAttr(_ element: AXUIElement, _ attr: CFString) -> String? {
-        var ref: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, attr, &ref) == .success else { return nil }
-        if let s = ref as? String { return s }
-        if let n = ref as? NSNumber { return n.stringValue }
-        return nil
-    }
-
-    static func boolAttr(_ element: AXUIElement, _ attr: CFString) -> Bool? {
-        var ref: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, attr, &ref) == .success else { return nil }
-        if let n = ref as? Bool { return n }
-        if let n = ref as? NSNumber { return n.boolValue }
-        return nil
-    }
-
-    static func bounds(of element: AXUIElement) -> Bounds? {
-        var posRef: CFTypeRef?
-        var sizeRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &posRef) == .success,
-              AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeRef) == .success
-        else { return nil }
-        var pos = CGPoint.zero
-        var size = CGSize.zero
-        if let p = posRef, CFGetTypeID(p) == AXValueGetTypeID() {
-            AXValueGetValue(p as! AXValue, .cgPoint, &pos)
-        }
-        if let s = sizeRef, CFGetTypeID(s) == AXValueGetTypeID() {
-            AXValueGetValue(s as! AXValue, .cgSize, &size)
-        }
-        return Bounds(x: Double(pos.x), y: Double(pos.y), width: Double(size.width), height: Double(size.height))
-    }
-
-    static func actions(of element: AXUIElement) -> [String] {
-        var ref: CFArray?
-        guard AXUIElementCopyActionNames(element, &ref) == .success, let arr = ref as? [String] else { return [] }
-        return arr
-    }
 }

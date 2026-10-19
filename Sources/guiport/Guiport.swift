@@ -60,6 +60,7 @@ struct Guiport: AsyncParsableCommand {
         // evaluates guiport's own Screen Recording grant instead of the host
         // terminal's. Re-execs (once) only for screen-capture commands.
         Responsibility.disclaimIfNeeded(arguments: CommandLine.arguments)
+        ResourceWatchdog.start()
         #endif
         installAdapter()
         await Self._mainAsync()

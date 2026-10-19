@@ -24,6 +24,7 @@ public final class TreeCache: @unchecked Sendable {
 
     private var entries: [Key: Entry] = [:]
     private let lock = NSLock()
+    private let maximumEntries = 8
 
     public init() {}
 
@@ -37,6 +38,7 @@ public final class TreeCache: @unchecked Sendable {
         )
 
         lock.lock()
+        entries = entries.filter { Date().timeIntervalSince($0.value.storedAt) < ttl }
         if let cached = entries[key], Date().timeIntervalSince(cached.storedAt) < ttl {
             hits += 1
             lock.unlock()
@@ -47,6 +49,11 @@ public final class TreeCache: @unchecked Sendable {
 
         let fresh = try Adapter.current.tree(target: target, maxDepth: maxDepth, includeHidden: includeHidden, scope: scope)
         lock.lock()
+        entries = entries.filter { Date().timeIntervalSince($0.value.storedAt) < ttl }
+        if entries[key] == nil, entries.count >= maximumEntries,
+           let oldest = entries.min(by: { $0.value.storedAt < $1.value.storedAt })?.key {
+            entries.removeValue(forKey: oldest)
+        }
         entries[key] = Entry(tree: fresh, storedAt: Date())
         lock.unlock()
         return fresh
