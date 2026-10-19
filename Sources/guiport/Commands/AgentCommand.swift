@@ -17,6 +17,9 @@ struct AgentCommand: AsyncParsableCommand {
     )
 
     static let label = "com.edihasaj.guiport.agent"
+    /// Bundle identity of the `guiport` executable (the `CFBundleIdentifier` in
+    /// `Resources/Info.plist`, embedded in the binary at link time).
+    static let bundleIdentifier = "com.edihasaj.guiport"
     static var plistPath: String {
         (NSHomeDirectory() as NSString).appendingPathComponent("Library/LaunchAgents/\(label).plist")
     }
@@ -50,16 +53,33 @@ struct AgentCommand: AsyncParsableCommand {
         return resolved
     }
 
-    /// Write the LaunchAgent plist for the current binary. Idempotent — both
-    /// `install` and `restart` call it so an upgraded install re-points itself.
-    static func writePlist() throws {
-        let bin = guiportPath()
-        let plist = """
+    /// Render the LaunchAgent plist XML.
+    ///
+    /// `AssociatedBundleIdentifiers` is the key that makes the job show up in
+    /// System Settings → General → Login Items *as guiport* rather than as a
+    /// nameless background item: per the `launchd.plist` man page, it "indicates
+    /// which bundles are associated with this job in the System Settings Login
+    /// Items UI", and a legacy plist installed by an app "should include this key
+    /// with a value of the app's bundle identifier". Without it launchd has no
+    /// bundle to attribute the job to, so the entry is anonymous and the user
+    /// cannot tell what it belongs to — or toggle it off.
+    ///
+    /// Pure — no `NSHomeDirectory()`, no filesystem access, no `launchctl` — so
+    /// tests can parse the result with `PropertyListSerialization` instead of
+    /// installing an agent. `writePlist()` is the only writer.
+    static func plistXML(executablePath: String, homePath: String) -> String {
+        let bin = xmlEscape(executablePath)
+        let logPath = xmlEscape((homePath as NSString).appendingPathComponent(".guiport/agent.log"))
+        return """
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
         <dict>
-          <key>Label</key><string>\(label)</string>
+          <key>Label</key><string>\(xmlEscape(label))</string>
+          <key>AssociatedBundleIdentifiers</key>
+          <array>
+            <string>\(xmlEscape(bundleIdentifier))</string>
+          </array>
           <key>ProgramArguments</key>
           <array>
             <string>\(bin)</string>
@@ -68,10 +88,26 @@ struct AgentCommand: AsyncParsableCommand {
           <key>RunAtLoad</key><true/>
           <key>KeepAlive</key><true/>
           <key>ProcessType</key><string>Interactive</string>
-          <key>StandardErrorPath</key><string>\(NSHomeDirectory())/.guiport/agent.log</string>
+          <key>StandardErrorPath</key><string>\(logPath)</string>
         </dict>
         </plist>
         """
+    }
+
+    /// Escape a value for plist XML. Home and install paths are plain POSIX
+    /// paths, but a username may legitimately contain `&` — unescaped, that
+    /// produces a plist launchd refuses to parse at all.
+    static func xmlEscape(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+    }
+
+    /// Write the LaunchAgent plist for the current binary. Idempotent — both
+    /// `install` and `restart` call it so an upgraded install re-points itself.
+    static func writePlist() throws {
+        let plist = plistXML(executablePath: guiportPath(), homePath: NSHomeDirectory())
         let dir = (plistPath as NSString).deletingLastPathComponent
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         try plist.write(toFile: plistPath, atomically: true, encoding: .utf8)

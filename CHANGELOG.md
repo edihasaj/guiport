@@ -5,6 +5,8 @@ All notable changes will be documented here. Format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Fixed
+- The input LaunchAgent identifies its associated guiport bundle in Login Items,
+  and installation paths containing XML characters remain valid.
 - Streams observe duration and Stop conditions while idle, bound pending frame
   retention and optional archives, and use the capture source's scale.
 - Accessibility inspection now bounds tree size, text, time, depth, and cycles,

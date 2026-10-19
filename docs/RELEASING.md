@@ -10,7 +10,9 @@ start a hosted macOS release job.
 When an owner intentionally dispatches the Release workflow from `production`:
 
 1. **bump** job — increments the patch in `Sources/GuiportCore/Version.swift`,
-   commits `chore(release): vX.Y.Z`, tags `vX.Y.Z`, pushes both to `main`.
+   commits `chore(release): vX.Y.Z`, tags `vX.Y.Z`, pushes the commit to
+   `production` and the tag to the repository. Merge the release commit back to
+   `main` after publication so the next release starts from the current version.
 2. **release** job (same run) — builds the universal macOS binary, wraps it in a
    Developer-ID-signed `guiport.app` (via `scripts/make-app-bundle.sh`, see
    below), packages `guiport-X.Y.Z-macos-universal.tar.gz` (containing the
