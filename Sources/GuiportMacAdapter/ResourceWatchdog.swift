@@ -20,6 +20,9 @@ public enum ResourceWatchdog {
             let message = "guiport: resource_limit: physical memory exceeded \(megabytes) MiB; stopped to protect the machine.\n"
             let flags = fcntl(STDERR_FILENO, F_GETFL)
             if flags >= 0, fcntl(STDERR_FILENO, F_SETFL, flags | O_NONBLOCK) == 0 {
+                // Restore the shared descriptor flags even if the pipe reader
+                // has gone away; SIGPIPE must not interrupt that cleanup.
+                _ = Darwin.signal(SIGPIPE, SIG_IGN)
                 message.withCString { pointer in
                     _ = Darwin.write(STDERR_FILENO, pointer, strlen(pointer))
                 }

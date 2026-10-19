@@ -302,7 +302,8 @@ public enum SessionBridge {
         while true {
             let remaining = deadline - ProcessInfo.processInfo.systemUptime
             guard remaining > 0 else { return }
-            var timeout = timeval(tv_sec: Int(remaining), tv_usec: Int32((remaining - floor(remaining)) * 1_000_000))
+            var timeout = timeval(tv_sec: Int(remaining),
+                                  tv_usec: max(1, Int32((remaining - floor(remaining)) * 1_000_000)))
             setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
             let n = read(client, &buf, buf.count)
             if n <= 0 { break }

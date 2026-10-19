@@ -14,7 +14,11 @@ final class ResourceGuardTests: XCTestCase {
         try verifyWatchdog(fullErrorPipe: true)
     }
 
-    private func verifyWatchdog(fullErrorPipe: Bool) throws {
+    func testMemoryWatchdogRestoresFlagsWhenErrorPipeReaderHasExited() throws {
+        try verifyWatchdog(fullErrorPipe: false, closedReader: true)
+    }
+
+    private func verifyWatchdog(fullErrorPipe: Bool, closedReader: Bool = false) throws {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: try CLI.binaryPath())
         // MCP waits for stdin. No AX permissions, screen capture, or input.
@@ -27,6 +31,7 @@ final class ResourceGuardTests: XCTestCase {
         let errors = Pipe()
         var retainedErrorFD = dup(errors.fileHandleForWriting.fileDescriptor)
         defer { if retainedErrorFD >= 0 { close(retainedErrorFD) } }
+        if closedReader { try errors.fileHandleForReading.close() }
         if fullErrorPipe {
             let fd = errors.fileHandleForWriting.fileDescriptor
             let flags = fcntl(fd, F_GETFL)
@@ -49,7 +54,7 @@ final class ResourceGuardTests: XCTestCase {
         XCTAssertEqual(fcntl(retainedErrorFD, F_GETFL) & O_NONBLOCK, 0)
         close(retainedErrorFD)
         retainedErrorFD = -1
-        if !fullErrorPipe {
+        if !fullErrorPipe && !closedReader {
             let stderr = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
             XCTAssertTrue(stderr.contains("resource_limit"), stderr)
         }
