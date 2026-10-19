@@ -73,6 +73,58 @@ public enum BackgroundAppOwnership {
         return owner
     }
 
+    /// Return the executable path launchd should execute for a verified owner.
+    ///
+    /// Homebrew's `bin/guiport` is a stable CLI symlink, but Background Task
+    /// Management can treat that generic CLI route differently from the app
+    /// bundle even when the resolved executable has a valid Team ID. For a
+    /// current Cellar bundle, use the stable `opt/guiport` route only when it
+    /// resolves to the exact executable inside the verified bundle. For every
+    /// other layout, return the direct bundle executable.
+    ///
+    /// The caller must obtain `owner` through `verifiedAndRegistered`; this
+    /// function validates path identity, while that operation establishes the
+    /// Developer ID identity and LaunchServices registration.
+    public static func preferredProgramURL(
+        owner: BackgroundAppOwner,
+        executableURL: URL,
+        homebrewFormula: String = "guiport"
+    ) -> URL? {
+        let executable = executableURL.resolvingSymlinksInPath().standardizedFileURL
+        let expected = owner.bundleURL
+            .appendingPathComponent("Contents/MacOS")
+            .appendingPathComponent(executable.lastPathComponent)
+            .resolvingSymlinksInPath()
+            .standardizedFileURL
+        guard expected == executable else { return nil }
+
+        let components = executable.pathComponents
+        guard
+            let cellarIndex = components.lastIndex(of: "Cellar"),
+            cellarIndex + 3 < components.count,
+            components[cellarIndex + 1] == homebrewFormula,
+            components[cellarIndex + 3] == owner.bundleURL.lastPathComponent
+        else {
+            return executable
+        }
+
+        let prefixComponents = components[..<cellarIndex]
+        let homebrewPrefix = prefixComponents.joined(separator: "/")
+        guard !homebrewPrefix.isEmpty else { return executable }
+
+        let suffix = components[(cellarIndex + 3)...]
+        let candidate = URL(fileURLWithPath: homebrewPrefix)
+            .appendingPathComponent("opt")
+            .appendingPathComponent(homebrewFormula)
+            .appendingPathComponent(suffix.joined(separator: "/"))
+            .standardizedFileURL
+
+        guard candidate.resolvingSymlinksInPath().standardizedFileURL == executable else {
+            return executable
+        }
+        return candidate
+    }
+
     /// Return the same plist when no verified owner exists. Repeated calls keep
     /// a single canonical association instead of accumulating duplicate values.
     public static func associating(

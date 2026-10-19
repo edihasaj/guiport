@@ -68,6 +68,16 @@ background item as **Guiport** with its bundled icon. A bare build, wrong bundle
 or invalid signature writes the same working LaunchAgent without an app
 association; do not add `AssociatedBundleIdentifiers` manually.
 
+For a verified Homebrew Cellar app, the LaunchAgent `Program` uses the matching
+stable `opt/guiport/guiport.app/Contents/MacOS/guiport` path. It retains
+`bin/guiport` as `ProgramArguments[0]`, followed by `agent-daemon`, so the CLI
+path remains stable while BTM receives an explicit verified bundle executable
+path to evaluate. The `opt` path is accepted only when it resolves to the exact
+executable in the verified current Cellar bundle; otherwise the direct verified
+bundle executable is used. A normal `guiport agent restart` rewrites this
+configuration after a Homebrew upgrade. Verify each release with a fresh BTM
+record and System Settings entry before claiming the displayed attribution.
+
 ### Exporting the cert
 
 ```sh

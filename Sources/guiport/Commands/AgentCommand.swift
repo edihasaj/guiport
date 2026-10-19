@@ -41,10 +41,10 @@ struct AgentCommand: AsyncParsableCommand {
     /// The exec'd binary is the same signed bundle either way, so the Screen
     /// Recording (TCC) identity is unchanged. Falls back to the resolved
     /// executable path for non-Homebrew installs with no such symlink.
-    static func guiportPath() -> String {
-        let resolved = Bundle.main.executableURL?.resolvingSymlinksInPath().path
+    static func guiportPath(resolvedExecutableURL: URL? = nil) -> String {
+        let resolved = (resolvedExecutableURL ?? Bundle.main.executableURL?.resolvingSymlinksInPath()
             ?? URL(fileURLWithPath: CommandLine.arguments.first ?? "guiport")
-                .resolvingSymlinksInPath().path
+                .resolvingSymlinksInPath()).path
         var candidates = ["/opt/homebrew/bin/guiport", "/usr/local/bin/guiport"]
         if let path = ProcessInfo.processInfo.environment["PATH"] {
             candidates += path.split(separator: ":").map { "\($0)/guiport" }
@@ -64,10 +64,10 @@ struct AgentCommand: AsyncParsableCommand {
                 .standardizedFileURL
     }
 
-    static func backgroundOwner() -> BackgroundAppOwner? {
+    static func backgroundOwner(executableURL: URL) -> BackgroundAppOwner? {
         #if os(macOS)
         return BackgroundAppOwnership.verifiedAndRegistered(
-            executableURL: resolvedExecutableURL(),
+            executableURL: executableURL,
             expectedBundleIdentifier: bundleIdentifier,
             verifySignature: verifyGuiportSignature,
             registerWithLaunchServices: registerWithLaunchServices
@@ -75,6 +75,21 @@ struct AgentCommand: AsyncParsableCommand {
         #else
         return nil
         #endif
+    }
+
+    static func backgroundOwner() -> BackgroundAppOwner? {
+        backgroundOwner(executableURL: resolvedExecutableURL())
+    }
+
+    static func programPath(
+        owner: BackgroundAppOwner?,
+        executableURL: URL
+    ) -> String? {
+        guard let owner else { return nil }
+        return BackgroundAppOwnership.preferredProgramURL(
+            owner: owner,
+            executableURL: executableURL
+        )?.path
     }
 
     #if os(macOS)
@@ -111,9 +126,10 @@ struct AgentCommand: AsyncParsableCommand {
     static func launchAgentPlist(
         binaryPath: String,
         owner: BackgroundAppOwner?,
+        programPath: String? = nil,
         homePath: String = NSHomeDirectory()
     ) -> [String: Any] {
-        let plist: [String: Any] = [
+        var plist: [String: Any] = [
             "Label": label,
             "ProgramArguments": [binaryPath, "agent-daemon"],
             "RunAtLoad": true,
@@ -121,16 +137,22 @@ struct AgentCommand: AsyncParsableCommand {
             "ProcessType": "Interactive",
             "StandardErrorPath": "\(homePath)/.guiport/agent.log",
         ]
+        if owner != nil, let programPath {
+            plist["Program"] = programPath
+        }
         return BackgroundAppOwnership.associating(plist, with: owner)
     }
 
     /// Write the LaunchAgent plist for the current binary. Idempotent — both
     /// `install` and `restart` call it so an upgraded install re-points itself.
     static func writePlist() throws {
-        let bin = guiportPath()
+        let executable = resolvedExecutableURL()
+        let bin = guiportPath(resolvedExecutableURL: executable)
+        let owner = backgroundOwner(executableURL: executable)
         let plist = launchAgentPlist(
             binaryPath: bin,
-            owner: backgroundOwner(),
+            owner: owner,
+            programPath: programPath(owner: owner, executableURL: executable),
             homePath: NSHomeDirectory()
         )
         let data = try PropertyListSerialization.data(
