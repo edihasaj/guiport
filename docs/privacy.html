@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>privacy — guiport</title>
+<meta name="description" content="How guiport.dev measures visits with self-hosted, cookieless analytics, and how to opt out.">
+<link rel="canonical" href="https://guiport.dev/privacy.html">
+<meta property="og:title" content="privacy — guiport">
+<meta property="og:description" content="Website analytics on guiport.dev: what is recorded, what is not, and how to opt out.">
+<meta property="og:url" content="https://guiport.dev/privacy.html">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://guiport.dev/assets/icon-512.png">
+<!-- Favicons -->
+<link rel="icon" type="image/svg+xml" href="assets/icon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-icon-180x180.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="android-icon-192x192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="favicon-512x512.png">
+<link rel="shortcut icon" href="favicon.ico">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0B1220">
+<link rel="stylesheet" href="style.css">
+<link rel="preconnect" href="https://fonts.bunny.net">
+<link href="https://fonts.bunny.net/css?family=jetbrains-mono:400,500,700,800&family=fraunces:400,700,900" rel="stylesheet">
+<style>
+/* Page title reuses the site's section-heading treatment; scoped here so the shared
+   stylesheet stays untouched. */
+.page-title {
+  font-family: var(--mono); font-weight: 800;
+  font-size: clamp(28px, 4.5vw, 44px);
+  letter-spacing: -0.01em;
+  margin: 0 0 18px;
+}
+</style>
+<!-- Same website analytics as the homepage. Disclosure below. -->
+<script async defer src="https://insights.applifyer.com/script.js"
+  data-website-id="9ee0c7ad-a914-47f7-b442-d1bafbe05b5f"
+  data-domains="guiport.dev,www.guiport.dev"
+  data-do-not-track="true"
+  data-exclude-search="true"
+  data-exclude-hash="true"></script>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="logo" href="./" aria-label="guiport home">
+    <img src="assets/logo.svg" alt="guiport" height="28">
+  </a>
+  <nav>
+    <a href="./#install">install</a>
+    <a href="./#quickstart">quick start</a>
+    <a href="./#cli">cli</a>
+    <a href="./#mcp">mcp</a>
+    <a href="https://github.com/edihasaj/guiport" target="_blank" rel="noreferrer">github ↗</a>
+  </nav>
+</header>
+
+<main>
+
+<section class="numbered in">
+  <p class="kicker">/* how this site is measured */</p>
+  <h1 class="page-title">privacy</h1>
+
+  <p>guiport.dev is a static site that loads one analytics script, a self-hosted Umami instance at
+  <code>insights.applifyer.com</code>. It counts visits so we can tell which pages people actually
+  read and which install path they came from. The numbers are aggregate totals in our own
+  dashboard, not something used for advertising or cross-site profiling.</p>
+
+  <p>For each visit we record the page you visited, the page that referred you, your browser
+  language, your device screen size, and an approximate location (country) derived from the
+  request. Analytics runs without cookies, and the query string and <code>#fragment</code> are
+  stripped from the page address before it is recorded, so links carrying parameters or in-page
+  anchors are counted as the plain page.</p>
+
+  <p>You can opt out. If your browser sends a Do Not Track signal, no pageview is sent at all. A
+  content blocker that blocks <code>insights.applifyer.com</code> works too. The site looks and
+  behaves the same either way; nothing on it depends on analytics.</p>
+
+  <div class="callout">
+    <strong>website only.</strong> This notice covers guiport.dev in the browser.
+    <em>This website configuration does not change CLI/MCP telemetry.</em>
+  </div>
+
+  <p>The site and the analytics instance are both run by Edi Hasaj, the author of guiport. The site
+  is served as static files from GitHub Pages. For anything here, open an issue on
+  <a href="https://github.com/edihasaj/guiport">the repository</a> or reach me at
+  <a href="https://edihasaj.com">edihasaj.com</a>.</p>
+</section>
+
+</main>
+
+<footer>
+  <p>guiport · MIT · built by <a href="https://edihasaj.com">Edi Hasaj</a> · <a href="https://github.com/edihasaj/guiport">github</a> · <a href="./">home</a></p>
+</footer>
+
+</body>
+</html>
