@@ -34,7 +34,7 @@
 }
 </style>
 <!-- Same website analytics as the homepage. Disclosure below. -->
-<script async defer src="https://insights.applifyer.com/script.js"
+<script async defer src="https://insights.applifyer.com/insights.js"
   data-website-id="9ee0c7ad-a914-47f7-b442-d1bafbe05b5f"
   data-domains="guiport.dev,www.guiport.dev"
   data-do-not-track="true"
@@ -69,9 +69,10 @@
 
   <p>For each visit we record the page you visited, the page that referred you, your browser
   language, your device screen size, and an approximate location (country) derived from the
-  request. Analytics runs without cookies, and the query string and <code>#fragment</code> are
-  stripped from the page address before it is recorded, so links carrying parameters or in-page
-  anchors are counted as the plain page.</p>
+  request. Analytics runs without cookies. Only the standard campaign tags
+  <code>utm_source</code>, <code>utm_medium</code>, <code>utm_campaign</code>,
+  <code>utm_term</code>, and <code>utm_content</code> are retained for attribution;
+  other query parameters and URL fragments are removed from tracked page addresses.</p>
 
   <p>You can opt out. If your browser sends a Do Not Track signal, no pageview is sent at all. A
   content blocker that blocks <code>insights.applifyer.com</code> works too. The site looks and

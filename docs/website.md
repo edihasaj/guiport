@@ -35,7 +35,7 @@ Website analytics is self-hosted Umami at `https://insights.applifyer.com`.
 Both `docs/index.html` and `docs/privacy.html` load the same snippet:
 
 ```html
-<script async defer src="https://insights.applifyer.com/script.js"
+<script async defer src="https://insights.applifyer.com/insights.js"
   data-website-id="9ee0c7ad-a914-47f7-b442-d1bafbe05b5f"
   data-domains="guiport.dev,www.guiport.dev"
   data-do-not-track="true"
@@ -47,8 +47,9 @@ Only pageviews are collected; the site deliberately configures **no custom
 events** (no `data-umami-event-*` attributes), so click tracking never fires.
 `data-domains` keeps the counts to the two real hostnames,
 `data-do-not-track` respects a browser Do Not Track signal, and
-`data-exclude-search` / `data-exclude-hash` strip the query string and
-`#fragment` from the recorded page address. Attribute names were checked
+The fleet tracker keeps only the five standard UTM attribution fields when
+`data-exclude-search` is enabled; other query parameters are removed.
+`data-exclude-hash` removes URL fragments. Attribute names were checked
 against the script that `insights.applifyer.com` actually serves.
 
 Add any new public page with the same snippet, its own
